@@ -14,17 +14,11 @@ CORS(app, origins=[
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# -----------------------------
-# ユーティリティ
-# -----------------------------
-def safe_list(val):
-    return val if isinstance(val, list) else []
-
 def clean_text(s: str) -> str:
     if not s:
         return ""
     s = re.sub(r"(nude|sexy|sensual|erotic|teen|young|schoolgirl)", "", s, flags=re.I)
-    return s.strip()[:400]
+    return s.strip()[:500]
 
 def build_safe_image_prompt(style, palette, design):
     return (
@@ -38,29 +32,46 @@ def build_safe_image_prompt(style, palette, design):
         "Minimal, refined, professional nail salon photography."
     )
 
-# -----------------------------
-# API
-# -----------------------------
+def parse_multipart_form(req):
+    """
+    multipart/form-data を JSONっぽい dict に整形
+    - checkboxは getlist で配列に
+    """
+    data = {}
+    # 単一値
+    for key in req.form.keys():
+        # checkboxなど複数の可能性があるので一旦 getlist で確認
+        vals = req.form.getlist(key)
+        if len(vals) == 1:
+            data[key] = vals[0]
+        else:
+            data[key] = vals
+    return data
+
 @app.route("/api/makeup", methods=["POST", "OPTIONS"])
 def makeup():
     if request.method == "OPTIONS":
         return "", 204
 
     try:
-        data = request.get_json()
+        # ✅ multipart/form-data 対応
+        data = parse_multipart_form(request)
 
-        # --- 入力整理 ---
-        info = []
+        # ✅ 画像は必須（フロントが必須にしてる想定）
+        nail_photo = request.files.get("nail_photo")
+        if nail_photo is None:
+            return jsonify({"status": "error", "error": "nail_photo が送られていません"}), 400
+
+        # --- 入力整形 ---
+        info_lines = []
         for k, v in data.items():
             if isinstance(v, list):
-                info.append(f"{k}: {', '.join(v)}")
+                info_lines.append(f"{k}: {', '.join(v)}")
             else:
-                info.append(f"{k}: {v}")
-        user_info = "\n".join(info)
+                info_lines.append(f"{k}: {v}")
+        user_info = "\n".join(info_lines)
 
-        # -----------------------------
-        # ① 3方向ネイル案（JSON）
-        # -----------------------------
+        # ① 3方向の提案（JSON）
         system_ideas = (
             "あなたはプロのネイリストです。"
             "以下の情報から、方向性が明確に異なるネイルデザイン案を3つ提案してください。\n"
@@ -70,7 +81,9 @@ def makeup():
             "出力は必ずJSONのみ。\n"
             "{"
             '"proposals": ['
-            '{"id":1,"name":"","style":"","palette":[],"design":"","why":""}'
+            '{"id":1,"name":"","style":"","palette":[],"design":"","why":""},'
+            '{"id":2,"name":"","style":"","palette":[],"design":"","why":""},'
+            '{"id":3,"name":"","style":"","palette":[],"design":"","why":""}'
             "]}"
         )
 
@@ -82,12 +95,9 @@ def makeup():
             ],
             temperature=0.8
         )
-
         proposals = json.loads(ideas_res.choices[0].message.content)["proposals"]
 
-        # -----------------------------
-        # ② 各案の詳細プラン
-        # -----------------------------
+        # ② 各案の詳細プラン + ③ 画像生成
         results = []
 
         for p in proposals:
@@ -101,19 +111,12 @@ def makeup():
                         "[お客様向けネイルコンセプト]\n"
                         "[サロン向け技術メモ]（プリジェル調合比率含む）"
                     },
-                    {
-                        "role": "user",
-                        "content": f"{user_info}\n\n提案:\n{json.dumps(p, ensure_ascii=False)}"
-                    }
+                    {"role": "user", "content": f"{user_info}\n\n提案:\n{json.dumps(p, ensure_ascii=False)}"}
                 ],
                 temperature=0.7
             )
-
             plan_text = plan_res.choices[0].message.content.strip()
 
-            # -----------------------------
-            # ③ 画像生成（Verify済み gpt-image-1）
-            # -----------------------------
             image_url = None
             try:
                 img_prompt = build_safe_image_prompt(
@@ -121,15 +124,13 @@ def makeup():
                     p.get("palette", []),
                     p.get("design", "")
                 )
-
                 img = client.images.generate(
                     model="gpt-image-1",
                     prompt=img_prompt,
                     size="1024x1024"
                 )
                 image_url = img.data[0].url
-
-            except Exception as img_err:
+            except Exception:
                 image_url = None
 
             results.append({
@@ -143,16 +144,10 @@ def makeup():
                 "image_url": image_url
             })
 
-        return jsonify({
-            "status": "ok",
-            "proposals": results
-        })
+        return jsonify({"status": "ok", "proposals": results})
 
     except Exception as e:
-        return jsonify({
-            "status": "error",
-            "error": str(e)
-        }), 500
+        return jsonify({"status": "error", "error": str(e)}), 500
 
 
 @app.route("/health")

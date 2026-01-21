@@ -15,12 +15,16 @@ CORS(app, origins=[
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
-def extract_json(text: str) -> dict:
-    t = text.strip()
+def safe_extract_json(text: str) -> dict:
+    t = (text or "").strip()
     if t.startswith("```"):
-        t = t.split("```")[1]
+        parts = t.split("```")
+        if len(parts) >= 2:
+            t = parts[1].strip()
     start = t.find("{")
     end = t.rfind("}")
+    if start == -1 or end == -1:
+        raise ValueError("JSONが見つかりませんでした")
     return json.loads(t[start:end+1])
 
 
@@ -33,35 +37,43 @@ def makeup():
         # ===== 画像（必須）=====
         image_file = request.files.get("nail_image")
         if not image_file:
-            return jsonify({"error": "爪の写真が必要です"}), 400
+            return jsonify({"error": "爪の写真（nail_image）が必要です"}), 400
 
         img_bytes = image_file.read()
         img_b64 = base64.b64encode(img_bytes).decode("utf-8")
 
         # ===== フォーム情報 =====
-        info = []
+        info_lines = []
         for k in request.form:
             vals = request.form.getlist(k)
-            info.append(f"{k}: {', '.join(vals)}")
-        user_info = "\n".join(info)
+            if len(vals) == 1:
+                info_lines.append(f"{k}: {vals[0]}")
+            else:
+                info_lines.append(f"{k}: {', '.join(vals)}")
+        user_text = "\n".join(info_lines).strip()
 
-        # ===== 1️⃣ ネイルプラン + 編集用プロンプト生成 =====
-        design_prompt = f"""
-You are a top creative nail artist.
+        # ===== 1) プラン + 編集プロンプト（遊び多め）=====
+        spec_prompt = f"""
+あなたはトップネイルアーティストです。
+以下の「お客様情報」と「爪の写真」を参考に、"シンプル寄りに逃げず" 遊び心とアート感を出した【1案】を作ってください。
 
-Based on the user's nail photo and answers, create ONE bold nail design.
-Do NOT be minimal. Add playful elements, contrast, texture, and artistic flair.
+制約：
+- 元の手・指・肌色・写真のライティングはそのまま（写真編集）
+- 変えるのは「ネイルデザイン」だけ
+- ラメ/ストーンを必須にしない（入れるなら控えめな表現）
+- ベージュ単色に寄らない：色相の幅、質感の幅（マット/グロス/ミラー風/オーロラ風）を使う
+- 現実のサロンで再現できる範囲のアート
 
-Return ONLY this JSON:
+次のJSONのみで出力：
 
 {{
-  "concept": "Emotional explanation for the client (Japanese)",
-  "design_detail": "Concrete colors, materials, accents, mood (Japanese)",
-  "edit_prompt": "English. Edit the uploaded image. Keep the same hand and skin. Change ONLY the nail design. Artistic, playful, expressive, non-minimal."
+  "concept_jp": "お客様向けの短いコンセプト（日本語）",
+  "detail_jp": "色・配置・質感・ポイント（日本語）",
+  "edit_prompt_en": "English prompt for editing the uploaded photo. Keep same hand/skin/lighting. Change ONLY nails. playful, artistic, expressive, multi-color, salon-realistic. No text."
 }}
 
-User info:
-{user_info}
+お客様情報：
+{user_text}
 """
 
         idea_res = client.chat.completions.create(
@@ -70,57 +82,61 @@ User info:
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": design_prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{img_b64}"
-                            }
-                        }
-                    ]
+                        {"type": "text", "text": spec_prompt},
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}}
+                    ],
                 }
             ],
             temperature=0.9
         )
 
-        idea = extract_json(idea_res.choices[0].message.content)
+        idea = safe_extract_json(idea_res.choices[0].message.content)
 
         plan_text = f"""【ネイルコンセプト】
-{idea["concept"]}
+{idea.get("concept_jp","")}
 
 【デザイン詳細】
-{idea["design_detail"]}
-"""
+{idea.get("detail_jp","")}
+""".strip()
 
-        # ===== 2️⃣ 画像編集（ここが超重要）=====
-        edit_prompt = f"""
-Edit the uploaded image.
+        # ===== 2) 画像編集（gpt-image-1 に image を渡す）=====
+        image_data_url = None
+        image_error = None
 
-Rules:
-- Keep the same hand, fingers, skin tone, lighting, and photo realism
-- Change ONLY the nail design
-- Be playful, artistic, expressive
-- Use multiple colors, textures, or art elements
-- Salon-realistic but bold
-- No text, no watermark, no logo
+        edit_prompt = (idea.get("edit_prompt_en") or "").strip()
+        if not edit_prompt:
+            edit_prompt = (
+                "Edit the uploaded photo. Keep the same hand, skin tone, and lighting. "
+                "Change ONLY the nail design. Make it playful, artistic, expressive, multi-color, "
+                "salon-realistic. No text."
+            )
 
-Design:
-{idea["edit_prompt"]}
-"""
+        try:
+            img_res = client.images.generate(
+                model="gpt-image-1",
+                # ✅ ここが編集：元画像を渡す
+                image=[f"data:image/jpeg;base64,{img_b64}"],
+                prompt=edit_prompt,
+                size="1024x1024",
+            )
 
-        image_res = client.images.edits(
-            model="gpt-image-1",
-            image=base64.b64decode(img_b64),
-            prompt=edit_prompt,
-            size="1024x1024"
-        )
+            b64_json = getattr(img_res.data[0], "b64_json", None)
+            url = getattr(img_res.data[0], "url", None)
 
-        b64_img = image_res.data[0].b64_json
-        image_data_url = "data:image/png;base64," + b64_img
+            if b64_json:
+                image_data_url = "data:image/png;base64," + b64_json
+            elif url:
+                image_data_url = url
+            else:
+                image_error = "画像データがレスポンスに含まれていません（b64_json/url共に無し）"
+
+        except Exception as e:
+            image_error = str(e)
 
         return jsonify({
             "plan": plan_text,
-            "image_data_url": image_data_url
+            "image_data_url": image_data_url,
+            "image_error": image_error
         })
 
     except Exception as e:

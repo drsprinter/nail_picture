@@ -25,8 +25,6 @@
       padding: 0 16px 40px;
       font-family: "Zen Kaku Gothic New", "Helvetica Neue", sans-serif;
       color: var(--ink);
-
-      /* ✅ GitHubに置いた背景 */
       background-image: url("https://raw.githubusercontent.com/drsprinter/nail_sample/main/background_blue.png");
       background-size: cover;
       background-repeat: no-repeat;
@@ -45,11 +43,7 @@
       backdrop-filter: blur(4px);
     }
 
-    /* Header */
-    .brand {
-      text-align: center;
-      margin-bottom: 14px;
-    }
+    .brand { text-align:center; margin-bottom: 14px; }
     .brand .logo {
       font-family: "Dancing Script", cursive;
       font-size: 34px;
@@ -66,7 +60,6 @@
       color: rgba(47,47,47,0.85);
     }
 
-    /* Section titles */
     h2 {
       font-size: 16px;
       margin: 20px 0 10px;
@@ -104,7 +97,6 @@
 
     textarea { resize: vertical; min-height: 90px; }
 
-    /* File */
     .fileWrap {
       margin-top: 10px;
       padding: 12px;
@@ -112,12 +104,8 @@
       border: 1px dashed rgba(0,0,0,0.18);
       background: rgba(255,255,255,0.6);
     }
-    input[type="file"]{
-      width: 100%;
-      font-size: 14px;
-    }
+    input[type="file"]{ width:100%; font-size:14px; background:#fff; }
 
-    /* Preview */
     .preview {
       display: none;
       margin-top: 12px;
@@ -126,17 +114,9 @@
       border: 1px solid rgba(0,0,0,0.10);
       background: rgba(255,255,255,0.85);
     }
-    .preview img{
-      width: 100%;
-      display: block;
-    }
-    .preview .cap{
-      padding: 10px 12px;
-      font-size: 12px;
-      color: rgba(47,47,47,0.72);
-    }
+    .preview img{ width:100%; display:block; }
+    .preview .cap{ padding: 10px 12px; font-size: 12px; color: rgba(47,47,47,0.72); }
 
-    /* Checkbox group */
     .checkbox-group {
       margin-top: 10px;
       padding: 12px;
@@ -158,7 +138,6 @@
       margin: 0;
     }
 
-    /* Button */
     button[type="submit"]{
       width: 100%;
       margin-top: 18px;
@@ -173,13 +152,8 @@
       box-shadow: 0 10px 22px rgba(111,159,196,0.25);
     }
     button[type="submit"]:hover { background: var(--accent-deep); }
-    button[disabled]{
-      opacity: 0.7;
-      cursor: not-allowed;
-      box-shadow: none;
-    }
+    button[disabled]{ opacity: 0.7; cursor: not-allowed; box-shadow:none; }
 
-    /* Result */
     .result {
       display: none;
       margin-top: 18px;
@@ -212,7 +186,6 @@
       color: rgba(47,47,47,0.70);
     }
 
-    /* Error box */
     .errorBox{
       display:none;
       margin-top: 14px;
@@ -226,9 +199,9 @@
       white-space: pre-wrap;
     }
 
-    /* ✅ Loading Popup (最重要：初期は絶対非表示) */
+    /* ✅ Loading Popup：初期は display:none（!importantは付けない） */
     #loadingPopup{
-      display: none !important; /* ← これで「最初から表示」バグを完全封じ */
+      display: none;
       position: fixed;
       inset: 0;
       z-index: 9999;
@@ -259,15 +232,12 @@
       animation: spin 0.9s linear infinite;
     }
     @keyframes spin{ to { transform: rotate(360deg); } }
-
-    /* small */
     .muted{ color: rgba(47,47,47,0.65); font-weight: 600; font-size: 12px; margin-top: 6px;}
   </style>
 </head>
 
 <body>
   <div class="container">
-
     <div class="brand">
       <h1 class="logo">Leilyce nail atelier</h1>
       <div class="sub">ネイルカウンセリングフォーム</div>
@@ -281,7 +251,6 @@
         <div class="help">※スマホのカメラが起動します。明るい場所で、指先がはっきり写るように撮ってね。</div>
       </div>
 
-      <!-- プレビュー -->
       <div class="preview" id="previewBox">
         <img id="previewImg" alt="爪写真プレビュー" />
         <div class="cap">撮影した写真プレビュー</div>
@@ -348,11 +317,12 @@
       <pre id="planText"></pre>
       <img id="nailImage" alt="ネイルサンプル画像">
       <div class="caption" id="imgCaption">※AIによるネイルイメージ</div>
-    </div>
 
+      <!-- デバッグ表示（必要なら消してOK） -->
+      <div class="errorBox" id="debugBox" style="display:none;"></div>
+    </div>
   </div>
 
-  <!-- ✅ 処理中ポップアップ（初期は絶対非表示） -->
   <div id="loadingPopup" aria-hidden="true">
     <div class="loadingCard">
       <div class="spinner"></div>
@@ -377,14 +347,14 @@
     const planText = document.getElementById("planText");
     const nailImage = document.getElementById("nailImage");
     const imgCaption = document.getElementById("imgCaption");
+    const debugBox = document.getElementById("debugBox");
 
-    // ✅ ページロード時に絶対非表示（保険）
+    // ✅ 保険：ロード時は非表示
     window.addEventListener("DOMContentLoaded", () => {
       popup.style.display = "none";
       popup.setAttribute("aria-hidden", "true");
     });
 
-    // ✅ 画像プレビュー
     fileInput.addEventListener("change", () => {
       const file = fileInput.files && fileInput.files[0];
       if (!file) {
@@ -398,7 +368,7 @@
     });
 
     function showLoading() {
-      popup.style.display = "flex";
+      popup.style.display = "flex"; // ✅ ここで表示
       popup.setAttribute("aria-hidden", "false");
       submitBtn.disabled = true;
       submitBtn.textContent = "送信中...";
@@ -421,11 +391,21 @@
       errorBox.textContent = "";
     }
 
+    function showDebug(msg) {
+      debugBox.style.display = "block";
+      debugBox.textContent = msg;
+    }
+
+    function clearDebug() {
+      debugBox.style.display = "none";
+      debugBox.textContent = "";
+    }
+
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       clearError();
+      clearDebug();
 
-      // ✅ 必須チェック（ファイル）
       if (!fileInput.files || fileInput.files.length === 0) {
         showError("爪の写真が未選択です。撮影または選択してください。");
         return;
@@ -441,13 +421,13 @@
           body: fd
         });
 
-        // ✅ まず text で受け取る（JSON以外でも落ちない）
+        // ✅ JSONじゃなくても落ちないようにまず text
         const raw = await response.text();
 
         let result;
         try {
           result = JSON.parse(raw);
-        } catch (e) {
+        } catch {
           throw new Error(`JSONではないレスポンスでした（HTTP ${response.status}）\n\n${raw.slice(0, 400)}...`);
         }
 
@@ -455,18 +435,27 @@
           throw new Error(result.error || `HTTP ${response.status}`);
         }
 
-        // ✅ 結果表示
+        // ✅ plan表示
         planText.textContent = result.plan || "(プランが取得できませんでした)";
 
-        // image_url / image_data_url どちらでも表示できるように
+        // ✅ 画像のキーを両対応
+        // 1) image_data_url (data:image/png;base64,...) ← gpt-image-1対応でよく使う
+        // 2) image_url (https://...) ← URL返る場合
         const src = result.image_data_url || result.image_url;
+
         if (src) {
+          nailImage.onload = () => { /* 読み込み成功 */ };
+          nailImage.onerror = () => {
+            showDebug("画像の読み込みに失敗しました。URLが期限切れ or CORS の可能性あり。\n" + src);
+          };
           nailImage.src = src;
           nailImage.style.display = "block";
           imgCaption.style.display = "block";
         } else {
           nailImage.style.display = "none";
           imgCaption.style.display = "none";
+          // デバッグ：レスポンス中身を見せる
+          showDebug("画像がレスポンスに含まれていません。\n受信JSON:\n" + JSON.stringify(result, null, 2));
         }
 
         resultDiv.style.display = "block";

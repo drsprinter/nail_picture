@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Leilyce nail atelier｜ネイルカウンセリングフォーム</title>
 
-  <!-- Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
 
   <style>
@@ -15,9 +14,8 @@
       margin: 0;
       padding: 0 16px;
       font-family: 'Noto Sans JP', sans-serif;
-      color: #2d3e50;
+      color: #243645;
 
-      /* ✅ GitHub Pages：リポジトリ直下に background_blue.png を置く想定 */
       background-image: url("./background_blue.png");
       background-size: cover;
       background-repeat: no-repeat;
@@ -26,9 +24,9 @@
     }
 
     .container {
-      max-width: 520px;
-      margin: 28px auto 60px;
-      padding: 28px 18px;
+      max-width: 560px;
+      margin: 26px auto 70px;
+      padding: 26px 18px;
       background: rgba(255, 255, 255, 0.92);
       border-radius: 18px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.08);
@@ -37,28 +35,28 @@
 
     .brand {
       text-align: center;
-      margin-bottom: 18px;
+      margin-bottom: 10px;
     }
     .brand .logo {
       font-family: 'Dancing Script', cursive;
-      font-size: 40px;
-      color: #6fa0b7;
-      line-height: 1.1;
+      font-size: 42px;
+      color: #5f95ad;
       margin: 0;
+      line-height: 1.05;
     }
     .brand .title {
       font-weight: 700;
-      color: #476877;
+      color: #3e6272;
       margin-top: 6px;
       font-size: 16px;
     }
 
     h2 {
       font-size: 18px;
-      border-left: 4px solid #a7cbdc;
+      border-left: 4px solid #9fc9dd;
       padding-left: 10px;
       margin-top: 26px;
-      color: #476877;
+      color: #3e6272;
     }
 
     label {
@@ -66,10 +64,10 @@
       margin-top: 16px;
       font-weight: 700;
       font-size: 14px;
-      color: #2d3e50;
+      color: #243645;
     }
 
-    input[type="text"], textarea, select, input[type="file"] {
+    input[type="text"], textarea, select {
       width: 100%;
       padding: 12px;
       font-size: 16px;
@@ -79,19 +77,11 @@
       background: rgba(255,255,255,0.95);
     }
 
-    .hint {
-      margin-top: 8px;
-      font-size: 12px;
-      color: #5f6f7a;
-      line-height: 1.5;
-    }
-
     .checkbox-group {
       margin-top: 10px;
       display: grid;
       gap: 10px;
     }
-
     .checkbox-group label {
       display: flex;
       align-items: center;
@@ -100,7 +90,6 @@
       font-weight: 400;
       font-size: 15px;
     }
-
     .checkbox-group input[type="checkbox"] {
       transform: scale(1.2);
     }
@@ -109,7 +98,7 @@
       margin-top: 22px;
       width: 100%;
       padding: 14px;
-      background-color: #6fa0b7;
+      background-color: #5f95ad;
       color: #fff;
       font-size: 17px;
       font-weight: 700;
@@ -118,59 +107,105 @@
       cursor: pointer;
       box-shadow: 0 4px 10px rgba(0,0,0,0.08);
     }
-    button[type="submit"]:hover {
-      background-color: #5a8ea6;
-    }
-    button[disabled] {
-      opacity: 0.7;
-      cursor: not-allowed;
+    button[type="submit"]:hover { background-color: #4d859f; }
+    button[disabled] { opacity: 0.7; cursor: not-allowed; }
+
+    .note {
+      margin-top: 10px;
+      font-size: 12px;
+      color: #5d6d77;
+      line-height: 1.55;
     }
 
-    .result {
-      margin-top: 26px;
-      padding: 18px;
-      background: rgba(249, 252, 255, 0.96);
-      border-radius: 14px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.05);
-    }
-
-    .result h2 {
-      margin-top: 0;
-    }
-
-    .result pre {
-      white-space: pre-wrap;
-      background: #eef7fb;
-      padding: 14px;
-      border-left: 4px solid #aad4ec;
-      border-radius: 10px;
-      margin: 12px 0 0;
-      font-size: 14px;
-      line-height: 1.65;
-    }
-
-    .preview {
+    .errorBox {
       margin-top: 14px;
-      display: none;
+      background: #fff3f3;
+      border: 1px solid #ffd1d1;
+      color: #8b2c2c;
+      padding: 12px;
       border-radius: 12px;
-      border: 1px solid #d7e2ea;
-      overflow: hidden;
-      background: #fff;
+      display: none;
+      font-size: 14px;
+      line-height: 1.6;
     }
-    .preview img {
+
+    /* results */
+    #result {
+      display: none;
+      margin-top: 24px;
+    }
+    .cards {
+      display: grid;
+      gap: 16px;
+      margin-top: 14px;
+    }
+    .card {
+      background: rgba(250, 253, 255, 0.96);
+      border: 1px solid #d9e7f0;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 10px 22px rgba(0,0,0,0.06);
+    }
+    .cardHeader {
+      padding: 14px 14px 10px;
+      border-bottom: 1px solid #e3eef5;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 12px;
+      font-weight: 700;
+      color: #3e6272;
+      background: #e7f3f9;
+      border: 1px solid #cfe7f4;
+      padding: 5px 10px;
+      border-radius: 999px;
+    }
+    .cardTitle {
+      margin: 10px 0 6px;
+      font-size: 16px;
+      font-weight: 800;
+      color: #243645;
+    }
+    .meta {
+      font-size: 13px;
+      color: #51636f;
+      line-height: 1.5;
+    }
+    .imgWrap {
+      background: #fff;
+      border-top: 1px solid #e3eef5;
+      border-bottom: 1px solid #e3eef5;
+    }
+    .imgWrap img {
       width: 100%;
       display: block;
     }
-
-    .caption {
-      text-align: center;
-      font-size: 12px;
-      color: #6b7b86;
-      margin-top: 8px;
+    .cardBody {
+      padding: 14px;
+    }
+    .plan {
+      white-space: pre-wrap;
+      background: #eef7fb;
+      border-left: 4px solid #9fc9dd;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 13px;
+      line-height: 1.65;
+      color: #20313f;
+      margin: 0;
+    }
+    details {
+      margin-top: 10px;
+    }
+    summary {
+      cursor: pointer;
+      font-weight: 800;
+      color: #3e6272;
     }
 
+    /* loading */
     #loadingPopup {
-      display: none; /* 初期は絶対非表示 */
+      display: none; /* 初期非表示 */
       position: fixed;
       top: 0; left: 0;
       width: 100%; height: 100%;
@@ -190,13 +225,13 @@
       text-align: center;
     }
     .loadingTitle {
-      color: #6fa0b7;
-      font-weight: 800;
+      color: #5f95ad;
+      font-weight: 900;
       font-size: 18px;
       margin: 4px 0 6px;
     }
     .loadingSub {
-      color: #5f6f7a;
+      color: #5d6d77;
       font-size: 13px;
       line-height: 1.6;
       margin: 0;
@@ -206,23 +241,11 @@
       height: 34px;
       border-radius: 999px;
       border: 4px solid #cfe3ee;
-      border-top-color: #6fa0b7;
+      border-top-color: #5f95ad;
       margin: 14px auto 10px;
       animation: spin 0.9s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-
-    .errorBox {
-      margin-top: 14px;
-      background: #fff3f3;
-      border: 1px solid #ffd1d1;
-      color: #8b2c2c;
-      padding: 12px;
-      border-radius: 12px;
-      display: none;
-      font-size: 14px;
-      line-height: 1.6;
-    }
   </style>
 </head>
 
@@ -234,15 +257,6 @@
     </div>
 
     <form id="nailForm">
-      <h2>写真アップロード</h2>
-
-      <label for="nail_photo">自分の爪の写真（カメラで撮影OK）</label>
-      <input id="nail_photo" name="nail_photo" type="file" accept="image/*" capture="environment" required />
-      <div class="hint">
-        ・明るい場所で、爪がはっきり写るように撮ると精度UP<br>
-        ・手全体より「指先〜爪」が大きめに写っていると良いです
-      </div>
-
       <h2>基本情報</h2>
 
       <label for="age">年齢層</label>
@@ -295,28 +309,26 @@
       <textarea id="avoid_colors" name="avoid_colors" rows="3" placeholder="例：派手な赤、ラメ、黒系が苦手..."></textarea>
 
       <button id="submitBtn" type="submit">送信する</button>
+      <div class="note">
+        ※3パターンの提案（ラメ・ストーン無し）を生成します。<br>
+        ※現在はサンプル画像（手元イメージ）を生成します。写真試着はVerify後に対応できます。
+      </div>
 
       <div class="errorBox" id="errorBox"></div>
     </form>
 
-    <div class="result" id="result" style="display:none;">
-      <h2>あなたのネイルプラン</h2>
-      <pre id="planText"></pre>
-
-      <div class="preview" id="previewBox">
-        <img id="nailImage" src="" alt="ネイル試着結果" />
-      </div>
-      <div class="caption" id="imgCaption" style="display:none;">※AIによるネイル試着イメージ（爪デザインのみ変更）</div>
+    <div id="result">
+      <h2>あなたへの提案（3パターン）</h2>
+      <div class="cards" id="cards"></div>
     </div>
   </div>
 
-  <!-- 処理中ポップアップ -->
   <div id="loadingPopup">
     <div class="loadingBox">
       <div class="loadingTitle">処理中です… しばらくお待ちください 💅</div>
       <div class="spinner"></div>
       <p class="loadingSub">
-        画像の解析とデザイン生成を行っています。<br>
+        カウンセリング内容から、3種類の提案と画像を生成しています。<br>
         通信環境により少し時間がかかる場合があります。
       </p>
     </div>
@@ -330,12 +342,8 @@
     const submitBtn = document.getElementById("submitBtn");
     const errorBox = document.getElementById("errorBox");
 
-    const resultDiv = document.getElementById("result");
-    const planText = document.getElementById("planText");
-
-    const previewBox = document.getElementById("previewBox");
-    const nailImage = document.getElementById("nailImage");
-    const imgCaption = document.getElementById("imgCaption");
+    const resultEl = document.getElementById("result");
+    const cardsEl = document.getElementById("cards");
 
     function showError(msg) {
       errorBox.textContent = msg;
@@ -346,57 +354,92 @@
       errorBox.style.display = "none";
     }
 
+    function escapeHTML(str) {
+      return (str || "").replace(/[&<>"']/g, (m) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      }[m]));
+    }
+
+    function cardHTML(p) {
+      const palette = (p.palette || []).join(" / ");
+      const keywords = (p.keywords || []).join(" / ");
+
+      return `
+        <div class="card">
+          <div class="cardHeader">
+            <span class="badge">${escapeHTML(p.style_axis || "提案")}</span>
+            <div class="cardTitle">${escapeHTML(p.name || "")}</div>
+            <div class="meta">
+              <div><b>カラー</b>：${escapeHTML(palette)}</div>
+              <div><b>雰囲気</b>：${escapeHTML(keywords)}</div>
+              <div><b>デザイン</b>：${escapeHTML(p.design || "")}</div>
+              <div><b>おすすめ理由</b>：${escapeHTML(p.why_fit || "")}</div>
+            </div>
+          </div>
+
+          ${p.image_url ? `
+            <div class="imgWrap">
+              <img src="${escapeHTML(p.image_url)}" alt="ネイルサンプル画像"
+                   onerror="this.style.display='none';" />
+            </div>
+          ` : ""}
+
+          <div class="cardBody">
+            <details open>
+              <summary>プランを見る</summary>
+              <pre class="plan">${escapeHTML(p.plan || "")}</pre>
+            </details>
+          </div>
+        </div>
+      `;
+    }
+
     formEl.addEventListener("submit", async (event) => {
       event.preventDefault();
       clearError();
 
-      // 画像必須チェック
-      const fileInput = document.getElementById("nail_photo");
-      if (!fileInput.files || fileInput.files.length === 0) {
-        showError("爪の写真を選択（または撮影）してください。");
-        return;
-      }
-
-      // UI: ローディング表示
       popup.style.display = "flex";
       submitBtn.disabled = true;
       submitBtn.textContent = "送信中...";
 
-      // multipart/form-data
-      const fd = new FormData(formEl);
+      const formData = new FormData(formEl);
+      const data = {};
+
+      // checkbox配列対応
+      for (const [key, value] of formData.entries()) {
+        if (data[key]) {
+          if (Array.isArray(data[key])) data[key].push(value);
+          else data[key] = [data[key], value];
+        } else {
+          data[key] = value;
+        }
+      }
 
       try {
-        const res = await fetch(`${API_BASE}/api/tryon`, {
+        const res = await fetch(`${API_BASE}/api/proposals`, {
           method: "POST",
-          body: fd
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
         });
 
-        // JSON以外が返ってきたときに落ちないように保険
-        let data = null;
         const ct = res.headers.get("content-type") || "";
-        if (ct.includes("application/json")) {
-          data = await res.json();
-        } else {
-          const text = await res.text();
-          throw new Error(`サーバーがJSON以外を返しました: ${text.slice(0, 200)}`);
-        }
+        const payload = ct.includes("application/json") ? await res.json() : null;
 
         if (!res.ok) {
-          throw new Error(data?.error || "不明なエラー");
+          throw new Error(payload?.error || "サーバーエラー");
         }
 
-        // 表示
-        planText.textContent = data.plan || "(プランが取得できませんでした)";
-        if (data.image_base64) {
-          nailImage.src = `data:image/png;base64,${data.image_base64}`;
-          previewBox.style.display = "block";
-          imgCaption.style.display = "block";
-        } else {
-          previewBox.style.display = "none";
-          imgCaption.style.display = "none";
+        const proposals = payload?.proposals || [];
+        if (proposals.length === 0) {
+          throw new Error("提案が取得できませんでした");
         }
 
-        resultDiv.style.display = "block";
+        cardsEl.innerHTML = proposals.map(cardHTML).join("");
+        resultEl.style.display = "block";
         formEl.style.display = "none";
 
       } catch (err) {

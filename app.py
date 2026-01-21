@@ -4,6 +4,7 @@ from openai import OpenAI
 import os
 import json
 import re
+import base64
 
 app = Flask(__name__)
 CORS(app, origins=[
@@ -17,30 +18,26 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 def clean_text(s: str) -> str:
     if not s:
         return ""
+    # 念のため：誤判定されやすい語を避ける
     s = re.sub(r"(nude|sexy|sensual|erotic|teen|young|schoolgirl)", "", s, flags=re.I)
-    return s.strip()[:500]
+    return s.strip()[:600]
 
 def build_safe_image_prompt(style, palette, design):
+    # “手”はOKだけど、より安全に「manicure photo」「fingers」寄りで表現
     return (
-        "Photorealistic close-up of a hand with elegant gel nails. "
-        "Clean studio background, soft natural lighting, "
-        "natural light beige skin tone. "
+        "Photorealistic manicure photo, close-up of fingers with gel nails. "
+        "Soft natural lighting, clean minimal background, professional nail salon photography. "
         "No text, no watermark, no logo. "
-        f"Nail design: {clean_text(design)}. "
-        f"Color palette: {clean_text(', '.join(palette))}. "
+        "Natural skin tone (light beige). "
         f"Style: {clean_text(style)}. "
-        "Minimal, refined, professional nail salon photography."
+        f"Colors: {clean_text(', '.join(palette))}. "
+        f"Design: {clean_text(design)}. "
+        "Simple and elegant, no glitter, no rhinestones."
     )
 
 def parse_multipart_form(req):
-    """
-    multipart/form-data を JSONっぽい dict に整形
-    - checkboxは getlist で配列に
-    """
     data = {}
-    # 単一値
     for key in req.form.keys():
-        # checkboxなど複数の可能性があるので一旦 getlist で確認
         vals = req.form.getlist(key)
         if len(vals) == 1:
             data[key] = vals[0]
@@ -54,10 +51,8 @@ def makeup():
         return "", 204
 
     try:
-        # ✅ multipart/form-data 対応
         data = parse_multipart_form(request)
 
-        # ✅ 画像は必須（フロントが必須にしてる想定）
         nail_photo = request.files.get("nail_photo")
         if nail_photo is None:
             return jsonify({"status": "error", "error": "nail_photo が送られていません"}), 400
@@ -77,7 +72,8 @@ def makeup():
             "以下の情報から、方向性が明確に異なるネイルデザイン案を3つ提案してください。\n"
             "条件:\n"
             "- シンプル系（ラメ・ストーン無し）\n"
-            "- 色味・印象・雰囲気が被らない\n\n"
+            "- 色味・印象・雰囲気が被らない\n"
+            "- 30代に似合う\n\n"
             "出力は必ずJSONのみ。\n"
             "{"
             '"proposals": ['
@@ -93,14 +89,14 @@ def makeup():
                 {"role": "system", "content": system_ideas},
                 {"role": "user", "content": user_info}
             ],
-            temperature=0.8
+            temperature=0.85
         )
+
         proposals = json.loads(ideas_res.choices[0].message.content)["proposals"]
 
-        # ② 各案の詳細プラン + ③ 画像生成
         results = []
-
         for p in proposals:
+            # ② 詳細プラン
             plan_res = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
@@ -109,7 +105,7 @@ def makeup():
                         "content":
                         "以下のネイル案について文章を作成してください。\n"
                         "[お客様向けネイルコンセプト]\n"
-                        "[サロン向け技術メモ]（プリジェル調合比率含む）"
+                        "[サロン向け技術メモ]（プリジェル調合比率・明るく/暗くの調整案も）"
                     },
                     {"role": "user", "content": f"{user_info}\n\n提案:\n{json.dumps(p, ensure_ascii=False)}"}
                 ],
@@ -117,21 +113,37 @@ def makeup():
             )
             plan_text = plan_res.choices[0].message.content.strip()
 
-            image_url = None
+            image_data_url = None
+            image_error = None
+
+            # ③ 画像生成（b64 を data URL に変換）
             try:
                 img_prompt = build_safe_image_prompt(
                     p.get("style", ""),
                     p.get("palette", []),
                     p.get("design", "")
                 )
-                img = client.images.generate(
+
+                img_res = client.images.generate(
                     model="gpt-image-1",
                     prompt=img_prompt,
                     size="1024x1024"
+                    # response_formatはSDKや環境で不要な場合あり
                 )
-                image_url = img.data[0].url
-            except Exception:
-                image_url = None
+
+                # ✅ gpt-image-1 は b64_json のことが多い
+                b64 = getattr(img_res.data[0], "b64_json", None)
+                url = getattr(img_res.data[0], "url", None)
+
+                if b64:
+                    image_data_url = f"data:image/png;base64,{b64}"
+                elif url:
+                    image_data_url = url  # urlが来た環境でもOK
+                else:
+                    image_error = "画像レスポンスに url / b64_json のどちらもありませんでした"
+
+            except Exception as e:
+                image_error = str(e)
 
             results.append({
                 "id": p.get("id"),
@@ -141,7 +153,10 @@ def makeup():
                 "design": p.get("design"),
                 "why": p.get("why"),
                 "plan": plan_text,
-                "image_url": image_url
+                # ✅ フロントではこれを src に突っ込むだけで表示できる
+                "image_data_url": image_data_url,
+                # ✅ 失敗理由も見える（デバッグ用）
+                "image_error": image_error
             })
 
         return jsonify({"status": "ok", "proposals": results})

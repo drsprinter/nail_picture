@@ -43,6 +43,7 @@
       color: #5f95ad;
       margin: 0;
       line-height: 1.05;
+      letter-spacing: 0.5px;
     }
     .brand .title {
       font-weight: 700;
@@ -67,7 +68,7 @@
       color: #243645;
     }
 
-    input[type="text"], textarea, select {
+    input[type="text"], textarea, select, input[type="file"] {
       width: 100%;
       padding: 12px;
       font-size: 16px;
@@ -75,6 +76,26 @@
       border: 1px solid #ccd6dd;
       margin-top: 8px;
       background: rgba(255,255,255,0.95);
+    }
+
+    .hint {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #5d6d77;
+      line-height: 1.6;
+    }
+
+    .photoPreview {
+      margin-top: 12px;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid #d9e7f0;
+      background: #fff;
+      display: none;
+    }
+    .photoPreview img {
+      width: 100%;
+      display: block;
     }
 
     .checkbox-group {
@@ -205,7 +226,7 @@
 
     /* loading */
     #loadingPopup {
-      display: none; /* 初期非表示 */
+      display: none;
       position: fixed;
       top: 0; left: 0;
       width: 100%; height: 100%;
@@ -257,6 +278,26 @@
     </div>
 
     <form id="nailForm">
+      <h2>爪の写真（必須）</h2>
+
+      <label for="nail_photo">あなたの爪の写真（必須）</label>
+      <input
+        type="file"
+        id="nail_photo"
+        name="nail_photo"
+        accept="image/*"
+        capture="environment"
+        required
+      />
+      <div class="hint">
+        ※スマホの場合、カメラが起動します。明るい場所で、手ブレしないように撮影してください。<br>
+        ※できれば「指先〜爪がはっきり写る」距離でお願いします。
+      </div>
+
+      <div class="photoPreview" id="photoPreview">
+        <img id="photoPreviewImg" alt="アップロード画像プレビュー">
+      </div>
+
       <h2>基本情報</h2>
 
       <label for="age">年齢層</label>
@@ -309,9 +350,11 @@
       <textarea id="avoid_colors" name="avoid_colors" rows="3" placeholder="例：派手な赤、ラメ、黒系が苦手..."></textarea>
 
       <button id="submitBtn" type="submit">送信する</button>
+
       <div class="note">
-        ※3パターンの提案（ラメ・ストーン無し）を生成します。<br>
-        ※現在はサンプル画像（手元イメージ）を生成します。写真試着はVerify後に対応できます。
+        ※爪写真は必須です。<br>
+        ※現在は「提案3パターン＋サンプル画像（手元イメージ）」を生成します。<br>
+        ※組織Verify後、あなたの写真に“ネイルを試着”する編集にも対応できます。
       </div>
 
       <div class="errorBox" id="errorBox"></div>
@@ -344,6 +387,23 @@
 
     const resultEl = document.getElementById("result");
     const cardsEl = document.getElementById("cards");
+
+    const photoInput = document.getElementById("nail_photo");
+    const previewWrap = document.getElementById("photoPreview");
+    const previewImg = document.getElementById("photoPreviewImg");
+
+    // 画像プレビュー
+    photoInput.addEventListener("change", () => {
+      const file = photoInput.files && photoInput.files[0];
+      if (!file) {
+        previewWrap.style.display = "none";
+        previewImg.src = "";
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      previewImg.src = url;
+      previewWrap.style.display = "block";
+    });
 
     function showError(msg) {
       errorBox.textContent = msg;
@@ -402,28 +462,22 @@
       event.preventDefault();
       clearError();
 
+      // ブラウザ標準のrequiredを補助（念のため）
+      if (!photoInput.files || !photoInput.files[0]) {
+        showError("爪の写真が未選択です。撮影（または選択）してから送信してください。");
+        return;
+      }
+
       popup.style.display = "flex";
       submitBtn.disabled = true;
       submitBtn.textContent = "送信中...";
 
-      const formData = new FormData(formEl);
-      const data = {};
-
-      // checkbox配列対応
-      for (const [key, value] of formData.entries()) {
-        if (data[key]) {
-          if (Array.isArray(data[key])) data[key].push(value);
-          else data[key] = [data[key], value];
-        } else {
-          data[key] = value;
-        }
-      }
-
       try {
+        const fd = new FormData(formEl);
+
         const res = await fetch(`${API_BASE}/api/proposals`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data)
+          body: fd // ← multipart/form-data（headersは付けない）
         });
 
         const ct = res.headers.get("content-type") || "";

@@ -5,246 +5,479 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Leilyce nail atelier</title>
 
-  <!-- フォント -->
-  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&family=Zen+Kaku+Gothic+New&display=swap" rel="stylesheet">
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@600&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
 
   <style>
     * { box-sizing: border-box; }
 
+    :root{
+      --ink: #2f2f2f;
+      --accent: #6f9fc4;
+      --accent-deep: #5a86a8;
+      --card: rgba(255,255,255,0.86);
+      --card-strong: rgba(255,255,255,0.92);
+      --line: rgba(0,0,0,0.12);
+    }
+
     body {
       margin: 0;
-      padding: 0 16px;
-      font-family: "Zen Kaku Gothic New", sans-serif;
+      padding: 0 16px 40px;
+      font-family: "Zen Kaku Gothic New", "Helvetica Neue", sans-serif;
+      color: var(--ink);
+
+      /* ✅ GitHubに置いた背景 */
       background-image: url("https://raw.githubusercontent.com/drsprinter/nail_sample/main/background_blue.png");
       background-size: cover;
       background-repeat: no-repeat;
       background-attachment: fixed;
-      color: #3b3b3b;
+      background-position: center;
     }
 
     .container {
-      max-width: 480px;
-      margin: 32px auto;
-      background: rgba(255,255,255,0.88);
+      max-width: 520px;
+      margin: 26px auto;
+      padding: 22px 18px 18px;
       border-radius: 18px;
-      padding: 24px;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+      background: var(--card);
+      box-shadow: 0 12px 34px rgba(0,0,0,0.10);
+      border: 1px solid rgba(255,255,255,0.55);
+      backdrop-filter: blur(4px);
     }
 
-    h1.logo {
+    /* Header */
+    .brand {
+      text-align: center;
+      margin-bottom: 14px;
+    }
+    .brand .logo {
       font-family: "Dancing Script", cursive;
-      font-size: 32px;
-      text-align: center;
-      color: #7fa6c8;
-      margin-bottom: 4px;
+      font-size: 34px;
+      color: var(--accent);
+      line-height: 1.05;
+      margin: 0;
+      letter-spacing: 0.5px;
+    }
+    .brand .sub {
+      margin: 6px 0 0;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: rgba(47,47,47,0.85);
     }
 
-    h1.sub {
-      text-align: center;
-      font-size: 16px;
-      font-weight: normal;
-      margin-bottom: 24px;
-    }
-
+    /* Section titles */
     h2 {
-      font-size: 17px;
-      border-left: 4px solid #7fa6c8;
-      padding-left: 8px;
-      margin-top: 28px;
+      font-size: 16px;
+      margin: 20px 0 10px;
+      padding-left: 10px;
+      border-left: 4px solid var(--accent);
+      color: rgba(47,47,47,0.92);
     }
 
     label {
       display: block;
-      margin-top: 18px;
-      font-weight: bold;
+      margin-top: 14px;
+      font-weight: 700;
+      font-size: 13px;
+      color: rgba(47,47,47,0.92);
+    }
+
+    .help {
+      font-weight: 400;
+      font-size: 12px;
+      color: rgba(47,47,47,0.7);
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+
+    input[type="text"], select, textarea {
+      width: 100%;
+      margin-top: 8px;
+      padding: 12px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      font-size: 15px;
+      background: var(--card-strong);
+      outline: none;
+    }
+
+    textarea { resize: vertical; min-height: 90px; }
+
+    /* File */
+    .fileWrap {
+      margin-top: 10px;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px dashed rgba(0,0,0,0.18);
+      background: rgba(255,255,255,0.6);
+    }
+    input[type="file"]{
+      width: 100%;
       font-size: 14px;
     }
 
-    input, select, textarea {
+    /* Preview */
+    .preview {
+      display: none;
+      margin-top: 12px;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(0,0,0,0.10);
+      background: rgba(255,255,255,0.85);
+    }
+    .preview img{
       width: 100%;
-      margin-top: 6px;
+      display: block;
+    }
+    .preview .cap{
+      padding: 10px 12px;
+      font-size: 12px;
+      color: rgba(47,47,47,0.72);
+    }
+
+    /* Checkbox group */
+    .checkbox-group {
+      margin-top: 10px;
       padding: 12px;
-      border-radius: 10px;
-      border: 1px solid #ccc;
-      font-size: 15px;
+      border-radius: 14px;
+      border: 1px solid rgba(0,0,0,0.08);
+      background: rgba(255,255,255,0.55);
     }
-
-    input[type="file"] {
-      background: #fff;
-    }
-
-    .checkbox-group label {
+    .checkbox-group label{
+      margin: 8px 0;
+      font-weight: 500;
+      font-size: 14px;
       display: flex;
       align-items: center;
-      font-weight: normal;
-      margin-top: 10px;
+      gap: 10px;
+      color: rgba(47,47,47,0.86);
+    }
+    .checkbox-group input[type="checkbox"]{
+      transform: scale(1.15);
+      margin: 0;
     }
 
-    .checkbox-group input {
-      margin-right: 8px;
-      transform: scale(1.2);
-    }
-
-    button {
+    /* Button */
+    button[type="submit"]{
       width: 100%;
-      margin-top: 28px;
-      padding: 14px;
-      border-radius: 12px;
+      margin-top: 18px;
+      padding: 14px 14px;
+      border-radius: 14px;
       border: none;
-      background: #7fa6c8;
+      background: var(--accent);
       color: #fff;
-      font-size: 17px;
-      font-weight: bold;
+      font-size: 16px;
+      font-weight: 800;
       cursor: pointer;
+      box-shadow: 0 10px 22px rgba(111,159,196,0.25);
+    }
+    button[type="submit"]:hover { background: var(--accent-deep); }
+    button[disabled]{
+      opacity: 0.7;
+      cursor: not-allowed;
+      box-shadow: none;
     }
 
-    button:disabled {
-      opacity: 0.6;
-    }
-
+    /* Result */
     .result {
-      margin-top: 32px;
       display: none;
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(0,0,0,0.08);
     }
-
-    .result pre {
+    .result pre{
       white-space: pre-wrap;
-      background: #f4f8fb;
+      margin: 10px 0 0;
       padding: 14px;
-      border-radius: 10px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.75);
+      border: 1px solid rgba(0,0,0,0.08);
       font-size: 14px;
+      line-height: 1.6;
     }
-
-    .result img {
+    .result img{
       width: 100%;
-      margin-top: 16px;
-      border-radius: 12px;
-      border: 1px solid #ddd;
+      margin-top: 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(0,0,0,0.10);
+      display: none;
+      background: rgba(255,255,255,0.8);
+    }
+    .caption{
+      display: none;
+      text-align: center;
+      margin-top: 8px;
+      font-size: 12px;
+      color: rgba(47,47,47,0.70);
     }
 
-    #loadingPopup {
-      display: none;
+    /* Error box */
+    .errorBox{
+      display:none;
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(210,60,60,0.18);
+      background: rgba(255,240,240,0.75);
+      color: rgba(120,20,20,0.95);
+      font-size: 13px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+
+    /* ✅ Loading Popup (最重要：初期は絶対非表示) */
+    #loadingPopup{
+      display: none !important; /* ← これで「最初から表示」バグを完全封じ */
       position: fixed;
       inset: 0;
-      background: rgba(255,255,255,0.92);
       z-index: 9999;
-      display: flex;
+      background: rgba(255,255,255,0.92);
       align-items: center;
       justify-content: center;
-      font-size: 18px;
-      color: #7fa6c8;
-      font-weight: bold;
+      padding: 18px;
       text-align: center;
+      color: var(--accent);
+      font-weight: 800;
+      font-size: 18px;
     }
+    .loadingCard{
+      width: min(420px, 92vw);
+      padding: 18px 16px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.9);
+      border: 1px solid rgba(0,0,0,0.08);
+      box-shadow: 0 16px 40px rgba(0,0,0,0.10);
+    }
+    .spinner{
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 3px solid rgba(111,159,196,0.25);
+      border-top-color: rgba(111,159,196,1);
+      margin: 0 auto 12px;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin{ to { transform: rotate(360deg); } }
+
+    /* small */
+    .muted{ color: rgba(47,47,47,0.65); font-weight: 600; font-size: 12px; margin-top: 6px;}
   </style>
 </head>
 
 <body>
+  <div class="container">
 
-<div class="container">
-  <h1 class="logo">Leilyce nail atelier</h1>
-  <h1 class="sub">ネイルカウンセリングフォーム</h1>
-
-  <form id="nailForm">
-    <h2>爪の写真（必須）</h2>
-    <label>
-      現在の爪の写真を撮影してください
-      <input type="file" name="nail_image" accept="image/*" capture="environment" required>
-    </label>
-
-    <h2>基本情報</h2>
-
-    <label>年齢層
-      <select name="age">
-        <option value="">選択してください</option>
-        <option>20代</option>
-        <option>30代</option>
-        <option>40代</option>
-        <option>50代以上</option>
-      </select>
-    </label>
-
-    <label>職業・ライフスタイル
-      <input type="text" name="lifestyle">
-    </label>
-
-    <h2>ネイルのイメージ</h2>
-
-    <label>雰囲気（複数選択可）</label>
-    <div class="checkbox-group">
-      <label><input type="checkbox" name="vibe" value="上品">上品</label>
-      <label><input type="checkbox" name="vibe" value="ナチュラル">ナチュラル</label>
-      <label><input type="checkbox" name="vibe" value="大人っぽい">大人っぽい</label>
-      <label><input type="checkbox" name="vibe" value="トレンド">トレンド</label>
+    <div class="brand">
+      <h1 class="logo">Leilyce nail atelier</h1>
+      <div class="sub">ネイルカウンセリングフォーム</div>
     </div>
 
-    <label>避けたいカラー・雰囲気
-      <textarea name="avoid"></textarea>
-    </label>
+    <form id="nailForm">
+      <h2>爪の写真（必須）</h2>
+      <label for="nail_image">現在の爪の写真を撮影してください</label>
+      <div class="fileWrap">
+        <input id="nail_image" name="nail_image" type="file" accept="image/*" capture="environment" required />
+        <div class="help">※スマホのカメラが起動します。明るい場所で、指先がはっきり写るように撮ってね。</div>
+      </div>
 
-    <button type="submit">ネイルプランを作成する</button>
-  </form>
+      <!-- プレビュー -->
+      <div class="preview" id="previewBox">
+        <img id="previewImg" alt="爪写真プレビュー" />
+        <div class="cap">撮影した写真プレビュー</div>
+      </div>
 
-  <div class="result" id="result">
-    <h2>あなたへのネイルプラン</h2>
-    <pre id="planText"></pre>
-    <img id="nailImage" style="display:none;">
+      <h2>基本情報</h2>
+
+      <label for="age">年齢層</label>
+      <select id="age" name="age">
+        <option value="">選択してください</option>
+        <option value="10代">10代</option>
+        <option value="20代">20代</option>
+        <option value="30代">30代</option>
+        <option value="40代">40代</option>
+        <option value="50代以上">50代以上</option>
+      </select>
+
+      <label for="lifestyle">職業やライフスタイル</label>
+      <input type="text" id="lifestyle" name="lifestyle" placeholder="例：オフィスワーク、接客業、在宅ワーク など" />
+
+      <label for="nail_duration">他サロンでのジェルネイルの持ちはどのくらいでしたか？（任意）</label>
+      <select id="nail_duration" name="nail_duration">
+        <option value="">選択してください</option>
+        <option value="1週間未満">1週間未満</option>
+        <option value="1〜2週間">1〜2週間</option>
+        <option value="2〜3週間">2〜3週間</option>
+        <option value="3〜4週間">3〜4週間</option>
+        <option value="4週間以上">4週間以上</option>
+        <option value="覚えていない">覚えていない</option>
+      </select>
+
+      <h2>ネイルの希望イメージ</h2>
+
+      <label>今回のネイルの目的（複数選択可）</label>
+      <div class="checkbox-group">
+        <label><input type="checkbox" name="purpose" value="仕事用"> 仕事に合わせて</label>
+        <label><input type="checkbox" name="purpose" value="気分転換"> 気分を上げたい</label>
+        <label><input type="checkbox" name="purpose" value="イベント"> イベント（旅行・推し活など）</label>
+        <label><input type="checkbox" name="purpose" value="人と会う"> 人と会う予定がある</label>
+        <label><input type="checkbox" name="purpose" value="なんとなく"> なんとなくキレイにしたい</label>
+      </div>
+
+      <label>希望するネイルの雰囲気（複数選択可）</label>
+      <div class="checkbox-group">
+        <label><input type="checkbox" name="vibe" value="上品"> 上品</label>
+        <label><input type="checkbox" name="vibe" value="可愛い"> 可愛い</label>
+        <label><input type="checkbox" name="vibe" value="大人っぽい"> 大人っぽい</label>
+        <label><input type="checkbox" name="vibe" value="ナチュラル"> ナチュラル</label>
+        <label><input type="checkbox" name="vibe" value="クール"> クール</label>
+        <label><input type="checkbox" name="vibe" value="トレンド感"> トレンド感ある</label>
+        <label><input type="checkbox" name="vibe" value="自分らしく"> 自分らしく</label>
+      </div>
+
+      <label for="avoid_colors">苦手・避けたいテイストやカラー（自由記述）</label>
+      <textarea id="avoid_colors" name="avoid_colors" rows="3" placeholder="例：派手な赤、ラメ、黒系が苦手..."></textarea>
+
+      <button type="submit" id="submitBtn">送信する</button>
+
+      <div class="errorBox" id="errorBox"></div>
+    </form>
+
+    <div class="result" id="result">
+      <h2>あなたのネイルプラン</h2>
+      <pre id="planText"></pre>
+      <img id="nailImage" alt="ネイルサンプル画像">
+      <div class="caption" id="imgCaption">※AIによるネイルイメージ</div>
+    </div>
+
   </div>
-</div>
 
-<div id="loadingPopup">処理中です…<br>しばらくお待ちください 💅</div>
+  <!-- ✅ 処理中ポップアップ（初期は絶対非表示） -->
+  <div id="loadingPopup" aria-hidden="true">
+    <div class="loadingCard">
+      <div class="spinner"></div>
+      処理中です… しばらくお待ちください 💅
+      <div class="muted">写真アップロード→プラン生成→画像生成の順で進みます</div>
+    </div>
+  </div>
 
-<script>
-const API_URL = "https://makeup-enz8.onrender.com/api/makeup";
+  <script>
+    const API_URL = "https://makeup-enz8.onrender.com/api/makeup";
 
-document.getElementById("nailForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
+    const form = document.getElementById("nailForm");
+    const popup = document.getElementById("loadingPopup");
+    const submitBtn = document.getElementById("submitBtn");
+    const errorBox = document.getElementById("errorBox");
 
-  const popup = document.getElementById("loadingPopup");
-  popup.style.display = "flex";
+    const previewBox = document.getElementById("previewBox");
+    const previewImg = document.getElementById("previewImg");
+    const fileInput = document.getElementById("nail_image");
 
-  const btn = e.target.querySelector("button");
-  btn.disabled = true;
+    const resultDiv = document.getElementById("result");
+    const planText = document.getElementById("planText");
+    const nailImage = document.getElementById("nailImage");
+    const imgCaption = document.getElementById("imgCaption");
 
-  const fd = new FormData(e.target);
-
-  try {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      body: fd
+    // ✅ ページロード時に絶対非表示（保険）
+    window.addEventListener("DOMContentLoaded", () => {
+      popup.style.display = "none";
+      popup.setAttribute("aria-hidden", "true");
     });
 
-    const raw = await res.text();
-    let data;
+    // ✅ 画像プレビュー
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) {
+        previewBox.style.display = "none";
+        previewImg.src = "";
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      previewImg.src = url;
+      previewBox.style.display = "block";
+    });
 
-    try {
-      data = JSON.parse(raw);
-    } catch {
-      throw new Error("JSONでないレスポンス:\n" + raw.slice(0, 200));
+    function showLoading() {
+      popup.style.display = "flex";
+      popup.setAttribute("aria-hidden", "false");
+      submitBtn.disabled = true;
+      submitBtn.textContent = "送信中...";
     }
 
-    if (!res.ok) {
-      throw new Error(data.error || "サーバーエラー");
+    function hideLoading() {
+      popup.style.display = "none";
+      popup.setAttribute("aria-hidden", "true");
+      submitBtn.disabled = false;
+      submitBtn.textContent = "送信する";
     }
 
-    document.getElementById("planText").textContent = data.plan || "";
-    if (data.image_url) {
-      const img = document.getElementById("nailImage");
-      img.src = data.image_url;
-      img.style.display = "block";
+    function showError(msg) {
+      errorBox.style.display = "block";
+      errorBox.textContent = msg;
     }
 
-    document.getElementById("result").style.display = "block";
-    e.target.style.display = "none";
+    function clearError() {
+      errorBox.style.display = "none";
+      errorBox.textContent = "";
+    }
 
-  } catch (err) {
-    alert("エラーが発生しました:\n" + err.message);
-  } finally {
-    popup.style.display = "none";
-    btn.disabled = false;
-  }
-});
-</script>
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      clearError();
 
+      // ✅ 必須チェック（ファイル）
+      if (!fileInput.files || fileInput.files.length === 0) {
+        showError("爪の写真が未選択です。撮影または選択してください。");
+        return;
+      }
+
+      showLoading();
+
+      try {
+        const fd = new FormData(form);
+
+        const response = await fetch(API_URL, {
+          method: "POST",
+          body: fd
+        });
+
+        // ✅ まず text で受け取る（JSON以外でも落ちない）
+        const raw = await response.text();
+
+        let result;
+        try {
+          result = JSON.parse(raw);
+        } catch (e) {
+          throw new Error(`JSONではないレスポンスでした（HTTP ${response.status}）\n\n${raw.slice(0, 400)}...`);
+        }
+
+        if (!response.ok) {
+          throw new Error(result.error || `HTTP ${response.status}`);
+        }
+
+        // ✅ 結果表示
+        planText.textContent = result.plan || "(プランが取得できませんでした)";
+
+        // image_url / image_data_url どちらでも表示できるように
+        const src = result.image_data_url || result.image_url;
+        if (src) {
+          nailImage.src = src;
+          nailImage.style.display = "block";
+          imgCaption.style.display = "block";
+        } else {
+          nailImage.style.display = "none";
+          imgCaption.style.display = "none";
+        }
+
+        resultDiv.style.display = "block";
+        form.style.display = "none";
+
+      } catch (err) {
+        showError("エラーが発生しました:\n" + err.message);
+      } finally {
+        hideLoading();
+      }
+    });
+  </script>
 </body>
 </html>

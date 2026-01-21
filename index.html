@@ -5,17 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Leilyce nail atelier｜ネイルカウンセリングフォーム</title>
 
-  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+  <!-- ロゴ用：Dancing Script / フォーム用：Noto Sans JP（ゴシック） -->
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
 
   <style>
     * { box-sizing: border-box; }
 
-    body {
+    :root{
+      --brand: #5f95ad;
+      --brand2: #9fc9dd;
+      --ink: #243645;
+      --muted: #5d6d77;
+      --card: rgba(255,255,255,0.92);
+      --line: #d9e7f0;
+      --shadow: rgba(0,0,0,0.08);
+    }
+
+    body{
       margin: 0;
       padding: 0 16px;
-      font-family: 'Noto Sans JP', sans-serif;
-      color: #243645;
+      font-family: "Noto Sans JP", sans-serif; /* フォームはゴシック */
+      color: var(--ink);
 
+      /* 背景：GitHub Pagesに置く watercolor 画像 */
       background-image: url("./background_blue.png");
       background-size: cover;
       background-repeat: no-repeat;
@@ -23,52 +35,54 @@
       background-attachment: fixed;
     }
 
-    .container {
+    .container{
       max-width: 560px;
       margin: 26px auto 70px;
       padding: 26px 18px;
-      background: rgba(255, 255, 255, 0.92);
+      background: var(--card);
       border-radius: 18px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+      box-shadow: 0 10px 30px var(--shadow);
       backdrop-filter: blur(2px);
     }
 
-    .brand {
+    /* 二段タイトル（改行） */
+    .brand{
       text-align: center;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
-    .brand .logo {
-      font-family: 'Dancing Script', cursive;
+    .brand .logo{
+      font-family: "Dancing Script", cursive; /* ロゴはオシャンティ */
       font-size: 42px;
-      color: #5f95ad;
+      color: var(--brand);
       margin: 0;
       line-height: 1.05;
       letter-spacing: 0.5px;
     }
-    .brand .title {
-      font-weight: 700;
+    .brand .subtitle{
+      margin-top: 8px;
+      font-weight: 900;
       color: #3e6272;
-      margin-top: 6px;
       font-size: 16px;
+      line-height: 1.2;
     }
 
-    h2 {
+    h2{
       font-size: 18px;
-      border-left: 4px solid #9fc9dd;
+      border-left: 4px solid var(--brand2);
       padding-left: 10px;
       margin-top: 26px;
       color: #3e6272;
     }
 
-    label {
-      display: block;
+    label{
+      display:block;
       margin-top: 16px;
-      font-weight: 700;
+      font-weight: 900;
       font-size: 14px;
-      color: #243645;
+      color: var(--ink);
     }
 
-    input[type="text"], textarea, select, input[type="file"] {
+    input[type="text"], textarea, select, input[type="file"]{
       width: 100%;
       padding: 12px;
       font-size: 16px;
@@ -78,191 +92,198 @@
       background: rgba(255,255,255,0.95);
     }
 
-    .hint {
+    .hint{
       margin-top: 8px;
       font-size: 12px;
-      color: #5d6d77;
+      color: var(--muted);
       line-height: 1.6;
     }
 
-    .photoPreview {
+    .photoPreview{
       margin-top: 12px;
       border-radius: 14px;
       overflow: hidden;
-      border: 1px solid #d9e7f0;
+      border: 1px solid var(--line);
       background: #fff;
       display: none;
     }
-    .photoPreview img {
+    .photoPreview img{
       width: 100%;
-      display: block;
+      display:block;
     }
 
-    .checkbox-group {
+    .checkbox-group{
       margin-top: 10px;
       display: grid;
       gap: 10px;
     }
-    .checkbox-group label {
-      display: flex;
-      align-items: center;
+    .checkbox-group label{
+      display:flex;
+      align-items:center;
       gap: 10px;
       margin: 0;
-      font-weight: 400;
+      font-weight: 500;
       font-size: 15px;
     }
-    .checkbox-group input[type="checkbox"] {
+    .checkbox-group input[type="checkbox"]{
       transform: scale(1.2);
     }
 
-    button[type="submit"] {
+    button[type="submit"]{
       margin-top: 22px;
       width: 100%;
       padding: 14px;
-      background-color: #5f95ad;
-      color: #fff;
+      background-color: var(--brand);
+      color:#fff;
       font-size: 17px;
-      font-weight: 700;
-      border: none;
+      font-weight: 900;
+      border:none;
       border-radius: 12px;
-      cursor: pointer;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+      cursor:pointer;
+      box-shadow: 0 4px 10px var(--shadow);
     }
-    button[type="submit"]:hover { background-color: #4d859f; }
-    button[disabled] { opacity: 0.7; cursor: not-allowed; }
+    button[type="submit"]:hover{ background-color: #4d859f; }
+    button[disabled]{ opacity: 0.7; cursor: not-allowed; }
 
-    .note {
+    .note{
       margin-top: 10px;
       font-size: 12px;
-      color: #5d6d77;
+      color: var(--muted);
       line-height: 1.55;
     }
 
-    .errorBox {
+    .errorBox{
       margin-top: 14px;
       background: #fff3f3;
       border: 1px solid #ffd1d1;
       color: #8b2c2c;
       padding: 12px;
       border-radius: 12px;
-      display: none;
+      display:none;
       font-size: 14px;
       line-height: 1.6;
     }
 
-    /* results */
-    #result {
-      display: none;
+    /* 結果 */
+    #result{
+      display:none;
       margin-top: 24px;
     }
-    .cards {
-      display: grid;
+    .cards{
+      display:grid;
       gap: 16px;
       margin-top: 14px;
     }
-    .card {
-      background: rgba(250, 253, 255, 0.96);
-      border: 1px solid #d9e7f0;
+    .card{
+      background: rgba(250,253,255,0.96);
+      border: 1px solid var(--line);
       border-radius: 16px;
-      overflow: hidden;
+      overflow:hidden;
       box-shadow: 0 10px 22px rgba(0,0,0,0.06);
     }
-    .cardHeader {
+    .cardHeader{
       padding: 14px 14px 10px;
       border-bottom: 1px solid #e3eef5;
     }
-    .badge {
-      display: inline-block;
+    .badge{
+      display:inline-block;
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 900;
       color: #3e6272;
       background: #e7f3f9;
       border: 1px solid #cfe7f4;
       padding: 5px 10px;
       border-radius: 999px;
     }
-    .cardTitle {
+    .cardTitle{
       margin: 10px 0 6px;
       font-size: 16px;
-      font-weight: 800;
-      color: #243645;
+      font-weight: 900;
+      color: var(--ink);
     }
-    .meta {
+    .meta{
       font-size: 13px;
       color: #51636f;
       line-height: 1.5;
     }
-    .imgWrap {
-      background: #fff;
+    .imgWrap{
+      background:#fff;
       border-top: 1px solid #e3eef5;
       border-bottom: 1px solid #e3eef5;
     }
-    .imgWrap img {
+    .imgWrap img{
       width: 100%;
-      display: block;
+      display:block;
     }
-    .cardBody {
+    .cardBody{
       padding: 14px;
     }
-    .plan {
+    .plan{
       white-space: pre-wrap;
       background: #eef7fb;
-      border-left: 4px solid #9fc9dd;
+      border-left: 4px solid var(--brand2);
       border-radius: 12px;
       padding: 12px;
       font-size: 13px;
       line-height: 1.65;
       color: #20313f;
-      margin: 0;
+      margin: 10px 0 0;
     }
-    details {
+    details{
       margin-top: 10px;
     }
-    summary {
-      cursor: pointer;
-      font-weight: 800;
+    summary{
+      cursor:pointer;
+      font-weight: 900;
       color: #3e6272;
     }
+    .imgFail{
+      padding: 12px 14px;
+      font-size: 12px;
+      color: #8b2c2c;
+      background: #fff3f3;
+      border-top: 1px solid #ffd1d1;
+    }
 
-    /* loading */
-    #loadingPopup {
-      display: none;
+    /* ローディング（submit時だけ表示） */
+    #loadingPopup{
+      display:none;           /* ← 初期は絶対出さない */
       position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background-color: rgba(255, 255, 255, 0.92);
-      z-index: 9999;
-      align-items: center;
-      justify-content: center;
+      top:0; left:0;
+      width:100%; height:100%;
+      background-color: rgba(255,255,255,0.92);
+      z-index:9999;
+      align-items:center;
+      justify-content:center;
       padding: 18px;
     }
-    .loadingBox {
+    .loadingBox{
       width: min(420px, 92vw);
       background: rgba(255,255,255,0.98);
       border: 1px solid #dbe8f0;
       border-radius: 16px;
       padding: 18px 16px;
       box-shadow: 0 12px 30px rgba(0,0,0,0.08);
-      text-align: center;
+      text-align:center;
     }
-    .loadingTitle {
-      color: #5f95ad;
+    .loadingTitle{
+      color: var(--brand);
       font-weight: 900;
       font-size: 18px;
       margin: 4px 0 6px;
     }
-    .loadingSub {
-      color: #5d6d77;
+    .loadingSub{
+      color: var(--muted);
       font-size: 13px;
       line-height: 1.6;
       margin: 0;
     }
-    .spinner {
+    .spinner{
       width: 34px;
       height: 34px;
       border-radius: 999px;
       border: 4px solid #cfe3ee;
-      border-top-color: #5f95ad;
+      border-top-color: var(--brand);
       margin: 14px auto 10px;
       animation: spin 0.9s linear infinite;
     }
@@ -273,11 +294,12 @@
 <body>
   <div class="container">
     <div class="brand">
+      <!-- 二段（改行） -->
       <h1 class="logo">Leilyce nail atelier</h1>
-      <div class="title">ネイルカウンセリングフォーム</div>
+      <div class="subtitle">ネイルカウンセリングフォーム</div>
     </div>
 
-    <form id="nailForm">
+    <form id="nailForm" novalidate>
       <h2>爪の写真（必須）</h2>
 
       <label for="nail_photo">あなたの爪の写真（必須）</label>
@@ -290,8 +312,8 @@
         required
       />
       <div class="hint">
-        ※スマホの場合、カメラが起動します。明るい場所で、手ブレしないように撮影してください。<br>
-        ※できれば「指先〜爪がはっきり写る」距離でお願いします。
+        ※スマホの場合、カメラが起動します。明るい場所で、爪先〜指先がはっきり写る距離で撮影してください。<br>
+        ※ピントが合わない場合は、少し離して撮り直すのがおすすめです。
       </div>
 
       <div class="photoPreview" id="photoPreview">
@@ -352,9 +374,8 @@
       <button id="submitBtn" type="submit">送信する</button>
 
       <div class="note">
-        ※爪写真は必須です。<br>
-        ※現在は「提案3パターン＋サンプル画像（手元イメージ）」を生成します。<br>
-        ※組織Verify後、あなたの写真に“ネイルを試着”する編集にも対応できます。
+        ※写真は必須です（スマホカメラ推奨）。<br>
+        ※結果は「3パターン提案（画像＋プラン）」で表示されます。
       </div>
 
       <div class="errorBox" id="errorBox"></div>
@@ -366,6 +387,7 @@
     </div>
   </div>
 
+  <!-- ローディングポップアップ（submit時だけ表示） -->
   <div id="loadingPopup">
     <div class="loadingBox">
       <div class="loadingTitle">処理中です… しばらくお待ちください 💅</div>
@@ -378,7 +400,9 @@
   </div>
 
   <script>
+    // ★RenderのURLに合わせて設定（現状のままでOKなら触らない）
     const API_BASE = "https://makeup-enz8.onrender.com";
+    const ENDPOINT = "/api/makeup"; // バックエンドが /api/makeup の場合
 
     const formEl = document.getElementById("nailForm");
     const popup = document.getElementById("loadingPopup");
@@ -391,6 +415,11 @@
     const photoInput = document.getElementById("nail_photo");
     const previewWrap = document.getElementById("photoPreview");
     const previewImg = document.getElementById("photoPreviewImg");
+
+    // 念のため：ロード時は必ず非表示（“開いた瞬間ずっと処理中”対策）
+    window.addEventListener("DOMContentLoaded", () => {
+      popup.style.display = "none";
+    });
 
     // 画像プレビュー
     photoInput.addEventListener("change", () => {
@@ -424,29 +453,31 @@
       }[m]));
     }
 
-    function cardHTML(p) {
-      const palette = (p.palette || []).join(" / ");
-      const keywords = (p.keywords || []).join(" / ");
+    function cardHTML(p, idx) {
+      const palette = Array.isArray(p.palette) ? p.palette.join(" / ") : "";
+      const style = p.style || p.style_axis || "";
+      const title = p.name || `提案 ${idx + 1}`;
 
       return `
         <div class="card">
           <div class="cardHeader">
-            <span class="badge">${escapeHTML(p.style_axis || "提案")}</span>
-            <div class="cardTitle">${escapeHTML(p.name || "")}</div>
+            <span class="badge">${escapeHTML(style || `提案 ${idx + 1}`)}</span>
+            <div class="cardTitle">${escapeHTML(title)}</div>
             <div class="meta">
               <div><b>カラー</b>：${escapeHTML(palette)}</div>
-              <div><b>雰囲気</b>：${escapeHTML(keywords)}</div>
               <div><b>デザイン</b>：${escapeHTML(p.design || "")}</div>
-              <div><b>おすすめ理由</b>：${escapeHTML(p.why_fit || "")}</div>
+              <div><b>おすすめ理由</b>：${escapeHTML(p.why || p.why_fit || "")}</div>
             </div>
           </div>
 
-          ${p.image_url ? `
-            <div class="imgWrap">
-              <img src="${escapeHTML(p.image_url)}" alt="ネイルサンプル画像"
-                   onerror="this.style.display='none';" />
-            </div>
-          ` : ""}
+          ${
+            p.image_url
+              ? `<div class="imgWrap">
+                   <img src="${escapeHTML(p.image_url)}" alt="ネイルサンプル画像"
+                        onerror="this.closest('.imgWrap').innerHTML='';" />
+                 </div>`
+              : `<div class="imgFail">画像生成に失敗しました（プランは表示できます）</div>`
+          }
 
           <div class="cardBody">
             <details open>
@@ -462,22 +493,24 @@
       event.preventDefault();
       clearError();
 
-      // ブラウザ標準のrequiredを補助（念のため）
+      // カメラ必須チェック（required補助）
       if (!photoInput.files || !photoInput.files[0]) {
         showError("爪の写真が未選択です。撮影（または選択）してから送信してください。");
         return;
       }
 
+      // ローディング表示（submit時のみ）
       popup.style.display = "flex";
       submitBtn.disabled = true;
       submitBtn.textContent = "送信中...";
 
       try {
+        // FormData（画像 + テキスト + checkbox複数）で送る
         const fd = new FormData(formEl);
 
-        const res = await fetch(`${API_BASE}/api/proposals`, {
+        const res = await fetch(`${API_BASE}${ENDPOINT}`, {
           method: "POST",
-          body: fd // ← multipart/form-data（headersは付けない）
+          body: fd
         });
 
         const ct = res.headers.get("content-type") || "";
@@ -487,13 +520,18 @@
           throw new Error(payload?.error || "サーバーエラー");
         }
 
-        const proposals = payload?.proposals || [];
-        if (proposals.length === 0) {
-          throw new Error("提案が取得できませんでした");
+        // 期待形式：{ status: "ok", proposals: [...] }
+        const proposals = payload?.proposals;
+
+        if (!Array.isArray(proposals) || proposals.length === 0) {
+          throw new Error("提案が取得できませんでした（proposals が空）");
         }
 
-        cardsEl.innerHTML = proposals.map(cardHTML).join("");
+        // 3案カード表示
+        cardsEl.innerHTML = proposals.slice(0, 3).map((p, i) => cardHTML(p, i)).join("");
         resultEl.style.display = "block";
+
+        // フォームは隠す（戻すボタンを付けたいなら言って）
         formEl.style.display = "none";
 
       } catch (err) {

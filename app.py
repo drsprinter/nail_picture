@@ -2,8 +2,8 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from openai import OpenAI
 import os
-import base64
 import json
+import io
 
 app = Flask(__name__)
 CORS(app, origins=[
@@ -40,7 +40,8 @@ def makeup():
             return jsonify({"error": "爪の写真（nail_image）が必要です"}), 400
 
         img_bytes = image_file.read()
-        img_b64 = base64.b64encode(img_bytes).decode("utf-8")
+        img_stream = io.BytesIO(img_bytes)
+        img_stream.name = "nail.jpg"  # OpenAI SDKによってはファイル名必須
 
         # ===== フォーム情報 =====
         info_lines = []
@@ -52,24 +53,24 @@ def makeup():
                 info_lines.append(f"{k}: {', '.join(vals)}")
         user_text = "\n".join(info_lines).strip()
 
-        # ===== 1) プラン + 編集プロンプト（遊び多め）=====
+        # ===== 1) 遊び多めな「編集指示」と「プラン」を作る =====
         spec_prompt = f"""
 あなたはトップネイルアーティストです。
-以下の「お客様情報」と「爪の写真」を参考に、"シンプル寄りに逃げず" 遊び心とアート感を出した【1案】を作ってください。
+ユーザーの爪写真をベースに「元の手・指・肌・光」は絶対に保持しつつ、ネイルデザインだけを大胆に変える提案を【1案】作ってください。
 
-制約：
-- 元の手・指・肌色・写真のライティングはそのまま（写真編集）
-- 変えるのは「ネイルデザイン」だけ
-- ラメ/ストーンを必須にしない（入れるなら控えめな表現）
-- ベージュ単色に寄らない：色相の幅、質感の幅（マット/グロス/ミラー風/オーロラ風）を使う
-- 現実のサロンで再現できる範囲のアート
+方向性（遊び多め）：
+- ベージュ単色に逃げない（色相の幅、素材感の幅）
+- ただしギラギラしすぎず上品さは残す
+- “写真編集”として成立（手の形や肌は変えない）
+- ストーンやラメは必須にしない（入れるなら控えめに）
+- 現実のサロンで再現可能な範囲
 
 次のJSONのみで出力：
 
 {{
   "concept_jp": "お客様向けの短いコンセプト（日本語）",
   "detail_jp": "色・配置・質感・ポイント（日本語）",
-  "edit_prompt_en": "English prompt for editing the uploaded photo. Keep same hand/skin/lighting. Change ONLY nails. playful, artistic, expressive, multi-color, salon-realistic. No text."
+  "edit_prompt_en": "English. Edit the uploaded photo. Keep the same hand/skin/lighting. Change ONLY the nail design. Playful, artistic, expressive, multi-color, salon-realistic. No text."
 }}
 
 お客様情報：
@@ -78,18 +79,9 @@ def makeup():
 
         idea_res = client.chat.completions.create(
             model="gpt-4.1-mini",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": spec_prompt},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}}
-                    ],
-                }
-            ],
+            messages=[{"role": "user", "content": spec_prompt}],
             temperature=0.9
         )
-
         idea = safe_extract_json(idea_res.choices[0].message.content)
 
         plan_text = f"""【ネイルコンセプト】
@@ -99,7 +91,7 @@ def makeup():
 {idea.get("detail_jp","")}
 """.strip()
 
-        # ===== 2) 画像編集（gpt-image-1 に image を渡す）=====
+        # ===== 2) 画像編集（ここが本命）=====
         image_data_url = None
         image_error = None
 
@@ -112,12 +104,12 @@ def makeup():
             )
 
         try:
-            img_res = client.images.generate(
+            # ✅ ここが「編集」
+            img_res = client.images.edits(
                 model="gpt-image-1",
-                # ✅ ここが編集：元画像を渡す
-                image=[f"data:image/jpeg;base64,{img_b64}"],
+                image=img_stream,
                 prompt=edit_prompt,
-                size="1024x1024",
+                size="1024x1024"
             )
 
             b64_json = getattr(img_res.data[0], "b64_json", None)

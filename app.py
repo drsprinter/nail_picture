@@ -15,53 +15,61 @@ CORS(app, origins=[
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
-def extract_json(text: str):
-    text = text.strip()
-    if text.startswith("```"):
-        text = text.split("```", 2)[1].strip()
-    start = text.find("{")
-    end = text.rfind("}")
+def safe_extract_json(text: str) -> dict:
+    """モデルが ```json ``` で返してもOKにしつつ JSON を抜く"""
+    t = (text or "").strip()
+    if t.startswith("```"):
+        parts = t.split("```")
+        if len(parts) >= 2:
+            t = parts[1].strip()
+    start = t.find("{")
+    end = t.rfind("}")
     if start == -1 or end == -1:
-        raise ValueError("JSONが見つかりません")
-    return json.loads(text[start:end+1])
+        raise ValueError("JSONが見つかりませんでした")
+    return json.loads(t[start:end+1])
 
 
-@app.route("/api/makeup", methods=["POST"])
+@app.route("/api/makeup", methods=["POST", "OPTIONS"])
 def makeup():
+    if request.method == "OPTIONS":
+        return "", 204
+
     try:
-        # ========= 画像取得 =========
+        # ===== 画像（必須）=====
         image_file = request.files.get("nail_image")
         if not image_file:
-            return jsonify({"error": "爪の画像が必要です"}), 400
+            return jsonify({"error": "爪の画像（nail_image）が必要です"}), 400
 
-        image_b64 = base64.b64encode(image_file.read()).decode("utf-8")
+        img_bytes = image_file.read()
+        img_b64 = base64.b64encode(img_bytes).decode("utf-8")
 
-        # ========= テキスト情報 =========
-        text_info = []
+        # ===== フォーム情報 =====
+        info_lines = []
         for k in request.form:
-            text_info.append(f"{k}: {request.form.getlist(k)}")
+            vals = request.form.getlist(k)
+            if len(vals) == 1:
+                info_lines.append(f"{k}: {vals[0]}")
+            else:
+                info_lines.append(f"{k}: {', '.join(vals)}")
+        user_text = "\n".join(info_lines).strip()
 
-        user_text = "\n".join(text_info)
-
-        # ========= ネイル案生成（幅広く） =========
+        # ===== 1) プラン & 画像プロンプト（幅広く）=====
         idea_prompt = f"""
 あなたは一流のネイルデザイナーです。
+以下のお客様情報と爪の写真を参考に、【1案】のネイルデザインを提案してください。
 
-以下のお客様情報と爪の写真をもとに、
-【1案のみ】ネイルデザインを提案してください。
+重要：
+- ベージュのワンカラーに寄りすぎない（幅広い配色・質感・アートの可能性を残す）
+- ただし現実のネイルサロンで再現可能な範囲
+- 手や指先のアップ写真として自然に成立するデザイン
+- 装飾は過剰にせず、上品な範囲で「透明感・ニュアンス・素材感・コントラスト」を表現
 
-制約：
-- ベージュ・ワンカラーに寄りすぎないこと
-- ニュアンス、透明感、コントラスト、アート要素、素材感（マット・シアー・ミラー等）を自由に使って良い
-- ただし「実際のサロンで再現可能」な範囲にすること
-- 個性は出してよいが奇抜すぎないこと
-
-出力は必ず次のJSON形式のみ：
+必ず次のJSONだけで出力：
 
 {{
-  "concept": "お客様向けのネイルコンセプト説明（情緒的・わかりやすく）",
+  "concept": "お客様向け（情緒的でわかりやすく）",
   "design_description": "色・配置・質感・ポイントを具体的に",
-  "image_prompt": "英語。実写ネイル写真。手元アップ。背景はシンプル。幅広い色表現を許可するプロンプト"
+  "image_prompt": "英語。Realistic photo. Close-up of a hand. Nails only. No text. Neutral background. Wide color expression allowed."
 }}
 
 お客様情報：
@@ -69,18 +77,14 @@ def makeup():
 """
 
         idea_res = client.chat.completions.create(
-            model="gpt-4.1",
+            # 速さ優先なら mini でもOK：gpt-4.1-mini
+            model="gpt-4.1-mini",
             messages=[
                 {
                     "role": "user",
                     "content": [
                         {"type": "text", "text": idea_prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{image_b64}"
-                            }
-                        }
+                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}}
                     ]
                 }
             ],
@@ -88,25 +92,59 @@ def makeup():
         )
 
         idea_raw = idea_res.choices[0].message.content
-        idea = extract_json(idea_raw)
+        idea = safe_extract_json(idea_raw)
 
-        # ========= 画像生成 =========
-        image_res = client.images.generate(
-            model="gpt-image-1",
-            prompt=idea["image_prompt"],
-            size="1024x1024"
-        )
-
-        image_url = image_res.data[0].url
-
-        return jsonify({
-            "plan": f"""【ネイルコンセプト】
-{idea['concept']}
+        plan_text = f"""【ネイルコンセプト】
+{idea.get("concept","")}
 
 【デザイン詳細】
-{idea['design_description']}
-""",
-            "image_url": image_url
+{idea.get("design_description","")}
+""".strip()
+
+        # ===== 2) 画像生成（gpt-image-1）=====
+        # 画像プロンプトは「手のアップ」「ネイルのみ」「露出系に見えない」方向に安全寄せ
+        img_prompt = (idea.get("image_prompt") or "").strip()
+        if not img_prompt:
+            # 最低限の保険
+            img_prompt = (
+                "A realistic close-up photo of a hand with stylish gel nails, "
+                "modern nuanced design, neutral background, soft natural lighting, no text."
+            )
+
+        image_data_url = None
+        image_error = None
+
+        try:
+            img_res = client.images.generate(
+                model="gpt-image-1",
+                prompt=img_prompt,
+                size="1024x1024"
+            )
+
+            # ✅ URLではなく b64_json を返すことが多い
+            b64_json = getattr(img_res.data[0], "b64_json", None)
+            url = getattr(img_res.data[0], "url", None)
+
+            if b64_json:
+                image_data_url = "data:image/png;base64," + b64_json
+            elif url:
+                # 環境によっては url が返る場合もあるので対応
+                image_data_url = url
+            else:
+                image_error = "画像データがレスポンスに含まれていません（b64_json/url共に無し）"
+
+        except Exception as e:
+            # 画像だけ失敗しても plan は返す
+            image_error = str(e)
+
+        return jsonify({
+            "plan": plan_text,
+            # フロントは image_data_url を優先して読む
+            "image_data_url": image_data_url,
+            # デバッグ用（必要ならフロントで表示）
+            "image_error": image_error,
+            # 互換キー（古いフロント向け）
+            "image_url": image_data_url if (image_data_url and image_data_url.startswith("http")) else None
         })
 
     except Exception as e:

@@ -15,17 +15,12 @@ CORS(app, origins=[
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
-def safe_extract_json(text: str) -> dict:
-    """モデルが ```json ``` で返してもOKにしつつ JSON を抜く"""
-    t = (text or "").strip()
+def extract_json(text: str) -> dict:
+    t = text.strip()
     if t.startswith("```"):
-        parts = t.split("```")
-        if len(parts) >= 2:
-            t = parts[1].strip()
+        t = t.split("```")[1]
     start = t.find("{")
     end = t.rfind("}")
-    if start == -1 or end == -1:
-        raise ValueError("JSONが見つかりませんでした")
     return json.loads(t[start:end+1])
 
 
@@ -38,113 +33,94 @@ def makeup():
         # ===== 画像（必須）=====
         image_file = request.files.get("nail_image")
         if not image_file:
-            return jsonify({"error": "爪の画像（nail_image）が必要です"}), 400
+            return jsonify({"error": "爪の写真が必要です"}), 400
 
         img_bytes = image_file.read()
         img_b64 = base64.b64encode(img_bytes).decode("utf-8")
 
         # ===== フォーム情報 =====
-        info_lines = []
+        info = []
         for k in request.form:
             vals = request.form.getlist(k)
-            if len(vals) == 1:
-                info_lines.append(f"{k}: {vals[0]}")
-            else:
-                info_lines.append(f"{k}: {', '.join(vals)}")
-        user_text = "\n".join(info_lines).strip()
+            info.append(f"{k}: {', '.join(vals)}")
+        user_info = "\n".join(info)
 
-        # ===== 1) プラン & 画像プロンプト（幅広く）=====
-        idea_prompt = f"""
-あなたは一流のネイルデザイナーです。
-以下のお客様情報と爪の写真を参考に、【1案】のネイルデザインを提案してください。
+        # ===== 1️⃣ ネイルプラン + 編集用プロンプト生成 =====
+        design_prompt = f"""
+You are a top creative nail artist.
 
-重要：
-- ベージュのワンカラーに寄りすぎない（幅広い配色・質感・アートの可能性を残す）
-- ただし現実のネイルサロンで再現可能な範囲
-- 手や指先のアップ写真として自然に成立するデザイン
-- 装飾は過剰にせず、上品な範囲で「透明感・ニュアンス・素材感・コントラスト」を表現
+Based on the user's nail photo and answers, create ONE bold nail design.
+Do NOT be minimal. Add playful elements, contrast, texture, and artistic flair.
 
-必ず次のJSONだけで出力：
+Return ONLY this JSON:
 
 {{
-  "concept": "お客様向け（情緒的でわかりやすく）",
-  "design_description": "色・配置・質感・ポイントを具体的に",
-  "image_prompt": "英語。Realistic photo. Close-up of a hand. Nails only. No text. Neutral background. Wide color expression allowed."
+  "concept": "Emotional explanation for the client (Japanese)",
+  "design_detail": "Concrete colors, materials, accents, mood (Japanese)",
+  "edit_prompt": "English. Edit the uploaded image. Keep the same hand and skin. Change ONLY the nail design. Artistic, playful, expressive, non-minimal."
 }}
 
-お客様情報：
-{user_text}
+User info:
+{user_info}
 """
 
         idea_res = client.chat.completions.create(
-            # 速さ優先なら mini でもOK：gpt-4.1-mini
             model="gpt-4.1-mini",
             messages=[
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": idea_prompt},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}}
+                        {"type": "text", "text": design_prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{img_b64}"
+                            }
+                        }
                     ]
                 }
             ],
-            temperature=0.85
+            temperature=0.9
         )
 
-        idea_raw = idea_res.choices[0].message.content
-        idea = safe_extract_json(idea_raw)
+        idea = extract_json(idea_res.choices[0].message.content)
 
         plan_text = f"""【ネイルコンセプト】
-{idea.get("concept","")}
+{idea["concept"]}
 
 【デザイン詳細】
-{idea.get("design_description","")}
-""".strip()
+{idea["design_detail"]}
+"""
 
-        # ===== 2) 画像生成（gpt-image-1）=====
-        # 画像プロンプトは「手のアップ」「ネイルのみ」「露出系に見えない」方向に安全寄せ
-        img_prompt = (idea.get("image_prompt") or "").strip()
-        if not img_prompt:
-            # 最低限の保険
-            img_prompt = (
-                "A realistic close-up photo of a hand with stylish gel nails, "
-                "modern nuanced design, neutral background, soft natural lighting, no text."
-            )
+        # ===== 2️⃣ 画像編集（ここが超重要）=====
+        edit_prompt = f"""
+Edit the uploaded image.
 
-        image_data_url = None
-        image_error = None
+Rules:
+- Keep the same hand, fingers, skin tone, lighting, and photo realism
+- Change ONLY the nail design
+- Be playful, artistic, expressive
+- Use multiple colors, textures, or art elements
+- Salon-realistic but bold
+- No text, no watermark, no logo
 
-        try:
-            img_res = client.images.generate(
-                model="gpt-image-1",
-                prompt=img_prompt,
-                size="1024x1024"
-            )
+Design:
+{idea["edit_prompt"]}
+"""
 
-            # ✅ URLではなく b64_json を返すことが多い
-            b64_json = getattr(img_res.data[0], "b64_json", None)
-            url = getattr(img_res.data[0], "url", None)
+        image_res = client.images.edits(
+            model="gpt-image-1",
+            image=base64.b64decode(img_b64),
+            prompt=edit_prompt,
+            size="1024x1024"
+        )
 
-            if b64_json:
-                image_data_url = "data:image/png;base64," + b64_json
-            elif url:
-                # 環境によっては url が返る場合もあるので対応
-                image_data_url = url
-            else:
-                image_error = "画像データがレスポンスに含まれていません（b64_json/url共に無し）"
-
-        except Exception as e:
-            # 画像だけ失敗しても plan は返す
-            image_error = str(e)
+        b64_img = image_res.data[0].b64_json
+        image_data_url = "data:image/png;base64," + b64_img
 
         return jsonify({
             "plan": plan_text,
-            # フロントは image_data_url を優先して読む
-            "image_data_url": image_data_url,
-            # デバッグ用（必要ならフロントで表示）
-            "image_error": image_error,
-            # 互換キー（古いフロント向け）
-            "image_url": image_data_url if (image_data_url and image_data_url.startswith("http")) else None
+            "image_data_url": image_data_url
         })
 
     except Exception as e:

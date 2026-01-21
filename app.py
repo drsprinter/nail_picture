@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from openai import OpenAI
 import os
+import json
 
 app = Flask(__name__)
 CORS(app, origins=[
@@ -12,46 +13,57 @@ CORS(app, origins=[
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# -----------------------------
-# ユーティリティ
-# -----------------------------
-def normalize_list(val):
-    if isinstance(val, list):
-        return val
-    if val is None or val == "":
-        return []
-    return [str(val)]
+def normalize_list_from_form(key: str):
+    # checkbox用
+    return request.form.getlist(key) if request.form.getlist(key) else []
 
 def safe_join(lst):
     return ", ".join([x for x in lst if x])
 
-# -----------------------------
-# 3案生成API（Verify不要で動く）
-# -----------------------------
 @app.route("/api/proposals", methods=["POST", "OPTIONS"])
 def proposals():
     if request.method == "OPTIONS":
         return "", 204
 
     try:
-        data = request.get_json(force=True) or {}
+        # 1) 画像必須チェック
+        if "nail_photo" not in request.files:
+            return jsonify({"error": "nail_photo が送信されていません（必須）"}), 400
 
-        age = data.get("age", "")
-        lifestyle = data.get("lifestyle", "")
-        nail_duration = data.get("nail_duration", "")
-        avoid_colors = data.get("avoid_colors", "")
-        purpose = normalize_list(data.get("purpose"))
-        vibe = normalize_list(data.get("vibe"))
+        photo = request.files["nail_photo"]
+        photo_bytes = photo.read()
 
-        # 1) 3つの「方向性の違う」提案をまず作る（ここが肝）
+        if not photo_bytes:
+            return jsonify({"error": "nail_photo が空です（撮影/選択をやり直してください）"}), 400
+
+        # 2) フォーム項目（multipartは request.form）
+        age = request.form.get("age", "")
+        lifestyle = request.form.get("lifestyle", "")
+        nail_duration = request.form.get("nail_duration", "")
+        avoid_colors = request.form.get("avoid_colors", "")
+
+        purpose = normalize_list_from_form("purpose")
+        vibe = normalize_list_from_form("vibe")
+
+        user_info = "\n".join([
+            f"年齢層: {age}",
+            f"職業/ライフスタイル: {lifestyle}",
+            f"他サロンでの持ち: {nail_duration}",
+            f"目的: {safe_join(purpose)}",
+            f"雰囲気: {safe_join(vibe)}",
+            f"避けたい: {avoid_colors}",
+            "条件: シンプル系、ラメ無し、ストーン無し、派手柄無し"
+        ])
+
+        # 3) まず「方向性の違う3案」をJSONで作る
         system_ideas = (
             "あなたはプロのネイリストです。"
             "以下のお客様情報から、方向性が明確に異なるネイル提案を3種類作ってください。\n"
             "必須条件：\n"
             "- シンプル系（ラメ・ストーン無し、派手柄無し）\n"
-            "- でも3案は『色味・雰囲気・印象』が被らない\n"
-            "- どれもお客様に似合う理由を添える\n\n"
-            "出力は必ずJSONのみで返してください。説明文は禁止。\n"
+            "- 3案は『色味・雰囲気・印象』が被らない\n"
+            "- 各案に、短い提案名、方向性（王道/トレンド/アクセント）、色、デザイン、似合う理由\n\n"
+            "出力は必ずJSONのみ。説明文は禁止。\n"
             "JSONスキーマ：\n"
             "{\n"
             '  "proposals": [\n'
@@ -68,31 +80,21 @@ def proposals():
             "}\n"
         )
 
-        user_info = "\n".join([
-            f"年齢層: {age}",
-            f"職業/ライフスタイル: {lifestyle}",
-            f"他サロンでの持ち: {nail_duration}",
-            f"目的: {safe_join(purpose)}",
-            f"雰囲気: {safe_join(vibe)}",
-            f"避けたい: {avoid_colors}",
-        ])
-
         ideas_resp = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_ideas},
                 {"role": "user", "content": user_info}
             ],
-            temperature=0.8
+            temperature=0.85
         )
 
-        # JSONとして読む（モデルが多少崩しても拾えるよう最低限ケア）
-        import json
         raw = ideas_resp.choices[0].message.content.strip()
+
         try:
             ideas_json = json.loads(raw)
         except Exception:
-            # 万一JSONが壊れたら、再度「JSONのみで」と強制して取り直す
+            # JSON崩れ救済
             fix_resp = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
@@ -103,23 +105,19 @@ def proposals():
             )
             ideas_json = json.loads(fix_resp.choices[0].message.content.strip())
 
-        proposals_list = ideas_json.get("proposals", [])
-        # 念のため3案に丸める
-        proposals_list = proposals_list[:3]
+        proposals_list = (ideas_json.get("proposals") or [])[:3]
 
-        # 2) 各案ごとに「お客様向け」「サロン向け（プリジェル顔料配合）」を作る
+        # 4) 各案ごとに「プラン文章」＋「画像プロンプト」＋「サンプル画像生成」
         system_plan = (
             "あなたはプロのネイリストです。"
             "以下の『お客様情報』と『デザイン案』を元に、文章を作ってください。\n"
             "必須条件：ラメ無し、ストーン無し、派手柄無し。\n"
-            "出力は次の2セクションに分ける：\n"
+            "出力は次の2セクション：\n"
             "[お客様向けネイルコンセプト]：丁寧でワクワクする説明。色・質感・印象。\n"
             "[サロン向け技術メモ]：プリジェル顔料の調合比率（例：顔料A:顔料B:クリア=1:1:8など）"
-            "＋塗布順（ベース/カラー/トップ）＋肌色や好みに合わせて明るく/暗くする調整案も書く。\n"
-            "注意：特定の商品名を断定しすぎず、一般的なプリジェル顔料想定でOK。"
+            "＋塗布順（ベース/カラー/トップ）＋明るく/暗くする調整案も書く。"
         )
 
-        # 3) 画像用プロンプト（3案ぶん）を英語で作る→DALL·Eで生成
         system_img_prompt = (
             "Write a short English prompt for generating a photorealistic nail sample image.\n"
             "Constraints:\n"
@@ -162,7 +160,7 @@ def proposals():
             )
             img_prompt = img_prompt_resp.choices[0].message.content.strip()
 
-            # 画像生成（Verify不要：dall-e-3）
+            # サンプル画像生成（Verify不要）
             img = client.images.generate(
                 model="dall-e-3",
                 prompt=img_prompt,
@@ -182,8 +180,12 @@ def proposals():
                 "why_fit": item.get("why_fit"),
                 "plan": plan_text,
                 "image_prompt": img_prompt,
-                "image_url": image_url
+                "image_url": image_url,
             })
+
+        # NOTE:
+        # photo_bytes は将来「写真試着（edit）」に使います（Verify後）
+        # 現状は必須入力としてUXを担保しつつ、提案精度に活かす段階です。
 
         return jsonify({
             "status": "ok",

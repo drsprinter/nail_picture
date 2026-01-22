@@ -4,6 +4,7 @@ from openai import OpenAI
 import os
 import json
 import io
+import openai
 
 app = Flask(__name__)
 CORS(app, origins=[
@@ -13,6 +14,7 @@ CORS(app, origins=[
 ])
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+print("OPENAI_VERSION:", openai.__version__)
 
 
 def safe_extract_json(text: str) -> dict:
@@ -24,7 +26,7 @@ def safe_extract_json(text: str) -> dict:
     start = t.find("{")
     end = t.rfind("}")
     if start == -1 or end == -1:
-        raise ValueError("JSONが見つかりませんでした")
+        raise ValueError("JSONが見つかりませんでした: " + (text[:200] if text else ""))
     return json.loads(t[start:end+1])
 
 
@@ -34,14 +36,28 @@ def makeup():
         return "", 204
 
     try:
-        # ===== 画像（必須）=====
-        image_file = request.files.get("nail_image")
+        # ★デバッグ：送られてきたfilesのキー一覧
+        incoming_file_keys = list(request.files.keys())
+        incoming_form_keys = list(request.form.keys())
+
+        # ===== 必須：爪画像（フロント name="nail_photo" に合わせる）=====
+        image_file = request.files.get("nail_photo")
         if not image_file:
-            return jsonify({"error": "爪の写真（nail_image）が必要です"}), 400
+            return jsonify({
+                "error": "爪の写真が必要です（nail_photo が見つかりません）",
+                "debug_files_keys": incoming_file_keys,
+                "debug_form_keys": incoming_form_keys
+            }), 400
 
         img_bytes = image_file.read()
+        if not img_bytes:
+            return jsonify({
+                "error": "爪の写真が空でした（ファイルサイズ0の可能性）",
+                "debug_files_keys": incoming_file_keys
+            }), 400
+
         img_stream = io.BytesIO(img_bytes)
-        img_stream.name = "nail.jpg"  # OpenAI SDKによってはファイル名必須
+        img_stream.name = "nail.jpg"
 
         # ===== フォーム情報 =====
         info_lines = []
@@ -53,24 +69,24 @@ def makeup():
                 info_lines.append(f"{k}: {', '.join(vals)}")
         user_text = "\n".join(info_lines).strip()
 
-        # ===== 1) 遊び多めな「編集指示」と「プラン」を作る =====
+        # ===== 1) プラン + 編集指示生成（遊び多め）=====
         spec_prompt = f"""
 あなたはトップネイルアーティストです。
-ユーザーの爪写真をベースに「元の手・指・肌・光」は絶対に保持しつつ、ネイルデザインだけを大胆に変える提案を【1案】作ってください。
+ユーザーの爪写真を「編集」して、ネイルだけを大胆に変える【1案】を提案してください。
 
-方向性（遊び多め）：
-- ベージュ単色に逃げない（色相の幅、素材感の幅）
-- ただしギラギラしすぎず上品さは残す
-- “写真編集”として成立（手の形や肌は変えない）
-- ストーンやラメは必須にしない（入れるなら控えめに）
+方針（遊び多め）：
+- ベージュ単色に寄せない（色相の幅を広く）
+- 透明感・ニュアンス・素材感（マット/ツヤ/ミラー風/オーロラ風）をMIX
+- ストーンやラメは必須にしない（入れても控えめ）
 - 現実のサロンで再現可能な範囲
+- 画像は「元の手・肌色・光・背景・構図」を保持し、変えるのは爪だけ
 
-次のJSONのみで出力：
+次のJSONだけで出力：
 
 {{
   "concept_jp": "お客様向けの短いコンセプト（日本語）",
   "detail_jp": "色・配置・質感・ポイント（日本語）",
-  "edit_prompt_en": "English. Edit the uploaded photo. Keep the same hand/skin/lighting. Change ONLY the nail design. Playful, artistic, expressive, multi-color, salon-realistic. No text."
+  "edit_prompt_en": "English. Edit the uploaded photo. Keep same hand/skin/lighting/background/composition. Change ONLY nails. Playful, artistic, expressive, multi-color, salon-realistic. No text."
 }}
 
 お客様情報：
@@ -91,27 +107,27 @@ def makeup():
 {idea.get("detail_jp","")}
 """.strip()
 
-        # ===== 2) 画像編集（ここが本命）=====
-        image_data_url = None
-        image_error = None
-
         edit_prompt = (idea.get("edit_prompt_en") or "").strip()
         if not edit_prompt:
             edit_prompt = (
-                "Edit the uploaded photo. Keep the same hand, skin tone, and lighting. "
-                "Change ONLY the nail design. Make it playful, artistic, expressive, multi-color, "
-                "salon-realistic. No text."
+                "Edit the uploaded photo. Keep the same hand, skin tone, lighting, background, and composition. "
+                "Change ONLY the nail design. Make it playful, artistic, expressive, multi-color, salon-realistic. "
+                "No text, no watermark."
             )
 
+        # ===== 2) 画像編集（SDK 2.x は images.edit）=====
+        image_data_url = None
+        image_error = None
+
         try:
-            # ✅ ここが「編集」
-            img_res = client.images.edits(
+            img_res = client.images.edit(
                 model="gpt-image-1",
                 image=img_stream,
                 prompt=edit_prompt,
-                size="1024x1024"
+                size="1024x1024",
             )
 
+            # SDKはurl or b64_json のどちらかが来る
             b64_json = getattr(img_res.data[0], "b64_json", None)
             url = getattr(img_res.data[0], "url", None)
 
@@ -128,7 +144,9 @@ def makeup():
         return jsonify({
             "plan": plan_text,
             "image_data_url": image_data_url,
-            "image_error": image_error
+            "image_error": image_error,
+            "debug_files_keys": incoming_file_keys,
+            "debug_form_keys": incoming_form_keys
         })
 
     except Exception as e:

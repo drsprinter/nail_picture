@@ -1,10 +1,8 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from openai import OpenAI
+import base64
 import os
-import json
-import io
-import openai
 
 app = Flask(__name__)
 CORS(app, origins=[
@@ -14,143 +12,109 @@ CORS(app, origins=[
 ])
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-print("OPENAI_VERSION:", openai.__version__)
 
-
-def safe_extract_json(text: str) -> dict:
-    t = (text or "").strip()
-    if t.startswith("```"):
-        parts = t.split("```")
-        if len(parts) >= 2:
-            t = parts[1].strip()
-    start = t.find("{")
-    end = t.rfind("}")
-    if start == -1 or end == -1:
-        raise ValueError("JSONが見つかりませんでした: " + (text[:200] if text else ""))
-    return json.loads(t[start:end+1])
-
-
-@app.route("/api/makeup", methods=["POST", "OPTIONS"])
+@app.route("/api/makeup", methods=["POST"])
 def makeup():
-    if request.method == "OPTIONS":
-        return "", 204
-
     try:
-        # ★デバッグ：送られてきたfilesのキー一覧
-        incoming_file_keys = list(request.files.keys())
-        incoming_form_keys = list(request.form.keys())
+        # ---------- 1. 入力チェック ----------
+        if "image" not in request.files:
+            return jsonify({"error": "爪の写真が必要です"}), 400
 
-        # ===== 必須：爪画像（フロント name="nail_photo" に合わせる）=====
-        image_file = request.files.get("nail_photo")
-        if not image_file:
-            return jsonify({
-                "error": "爪の写真が必要です（nail_photo が見つかりません）",
-                "debug_files_keys": incoming_file_keys,
-                "debug_form_keys": incoming_form_keys
-            }), 400
+        image_file = request.files["image"]
+        image_bytes = image_file.read()
+        image_b64 = base64.b64encode(image_bytes).decode("utf-8")
 
-        img_bytes = image_file.read()
-        if not img_bytes:
-            return jsonify({
-                "error": "爪の写真が空でした（ファイルサイズ0の可能性）",
-                "debug_files_keys": incoming_file_keys
-            }), 400
+        form_data = request.form.to_dict(flat=False)
 
-        img_stream = io.BytesIO(img_bytes)
-        img_stream.name = "nail.jpg"
-
-        # ===== フォーム情報 =====
+        # ---------- 2. ユーザー入力を整形 ----------
         info_lines = []
-        for k in request.form:
-            vals = request.form.getlist(k)
-            if len(vals) == 1:
-                info_lines.append(f"{k}: {vals[0]}")
+        for key, values in form_data.items():
+            if isinstance(values, list):
+                info_lines.append(f"{key}: {', '.join(values)}")
             else:
-                info_lines.append(f"{k}: {', '.join(vals)}")
-        user_text = "\n".join(info_lines).strip()
+                info_lines.append(f"{key}: {values}")
+        user_text = "\n".join(info_lines)
 
-        # ===== 1) プラン + 編集指示生成（遊び多め）=====
-        spec_prompt = f"""
-あなたはトップネイルアーティストです。
-ユーザーの爪写真を「編集」して、ネイルだけを大胆に変える【1案】を提案してください。
+        # ---------- 3. ネイルプラン生成（日本語） ----------
+        plan_prompt = f"""
+あなたはプロのネイリストです。
+以下のお客様情報をもとに、やりすぎないが洗練されたネイルデザインを【1案】提案してください。
 
-方針（遊び多め）：
-- ベージュ単色に寄せない（色相の幅を広く）
-- 透明感・ニュアンス・素材感（マット/ツヤ/ミラー風/オーロラ風）をMIX
-- ストーンやラメは必須にしない（入れても控えめ）
-- 現実のサロンで再現可能な範囲
-- 画像は「元の手・肌色・光・背景・構図」を保持し、変えるのは爪だけ
+条件：
+・選択項目を最優先で尊重する
+・奇抜にしすぎない（新しさは10〜20%まで）
+・日常に馴染むデザイン
+・ベージュ単色に寄りすぎない
 
-次のJSONだけで出力：
-
-{{
-  "concept_jp": "お客様向けの短いコンセプト（日本語）",
-  "detail_jp": "色・配置・質感・ポイント（日本語）",
-  "edit_prompt_en": "English. Edit the uploaded photo. Keep same hand/skin/lighting/background/composition. Change ONLY nails. Playful, artistic, expressive, multi-color, salon-realistic. No text."
-}}
+出力形式：
+【ネイルコンセプト】
+【デザイン詳細】
 
 お客様情報：
 {user_text}
 """
 
-        idea_res = client.chat.completions.create(
-            model="gpt-4.1-mini",
-            messages=[{"role": "user", "content": spec_prompt}],
-            temperature=0.9
+        plan_res = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "あなたはトップネイルアーティストです。"},
+                {"role": "user", "content": plan_prompt}
+            ],
+            temperature=0.6
         )
-        idea = safe_extract_json(idea_res.choices[0].message.content)
 
-        plan_text = f"""【ネイルコンセプト】
-{idea.get("concept_jp","")}
+        plan_text = plan_res.choices[0].message.content.strip()
 
-【デザイン詳細】
-{idea.get("detail_jp","")}
-""".strip()
+        # ---------- 4. 画像編集プロンプト生成（英語） ----------
+        spec_prompt = f"""
+You are a professional nail artist.
+Create ONE subtle nail design based strictly on the user's preferences.
 
-        edit_prompt = (idea.get("edit_prompt_en") or "").strip()
-        if not edit_prompt:
-            edit_prompt = (
-                "Edit the uploaded photo. Keep the same hand, skin tone, lighting, background, and composition. "
-                "Change ONLY the nail design. Make it playful, artistic, expressive, multi-color, salon-realistic. "
-                "No text, no watermark."
-            )
+Rules:
+- Keep the same hand, skin tone, lighting, background, and composition
+- Edit ONLY the nails
+- Follow user's choices first
+- Add only 10–20% novelty
+- Elegant, salon-realistic, wearable
+- Avoid bold patterns, neon, heavy glitter, large stones
+- No text, no watermark
 
-        # ===== 2) 画像編集（SDK 2.x は images.edit）=====
-        image_data_url = None
-        image_error = None
+User preferences:
+{user_text}
+"""
 
-        try:
-            img_res = client.images.edit(
-                model="gpt-image-1",
-                image=img_stream,
-                prompt=edit_prompt,
-                size="1024x1024",
-            )
+        spec_res = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You generate image edit prompts."},
+                {"role": "user", "content": spec_prompt}
+            ],
+            temperature=0.4
+        )
 
-            # SDKはurl or b64_json のどちらかが来る
-            b64_json = getattr(img_res.data[0], "b64_json", None)
-            url = getattr(img_res.data[0], "url", None)
+        edit_prompt_en = spec_res.choices[0].message.content.strip()
 
-            if b64_json:
-                image_data_url = "data:image/png;base64," + b64_json
-            elif url:
-                image_data_url = url
-            else:
-                image_error = "画像データがレスポンスに含まれていません（b64_json/url共に無し）"
+        # ---------- 5. 画像編集（爪写真ベース） ----------
+        image_res = client.images.generate(
+            model="gpt-image-1",
+            prompt=edit_prompt_en,
+            image=image_b64,
+            size="1024x1024"
+        )
 
-        except Exception as e:
-            image_error = str(e)
+        image_base64 = image_res.data[0].b64_json
+        image_data_url = f"data:image/png;base64,{image_base64}"
 
+        # ---------- 6. レスポンス ----------
         return jsonify({
             "plan": plan_text,
-            "image_data_url": image_data_url,
-            "image_error": image_error,
-            "debug_files_keys": incoming_file_keys,
-            "debug_form_keys": incoming_form_keys
+            "image_data_url": image_data_url
         })
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({
+            "error": str(e)
+        }), 500
 
 
 if __name__ == "__main__":

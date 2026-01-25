@@ -29,7 +29,7 @@
       color: var(--ink);
       font-family: "Noto Sans JP", system-ui, -apple-system, sans-serif;
 
-      /* 背景：GitHub Pagesに置く画像 */
+      /* 背景：GitHub Pagesに置く画像（同階層に background_blue.png） */
       background-image:
         radial-gradient(1200px 800px at 10% 10%, rgba(255,255,255,0.65), rgba(255,255,255,0)),
         radial-gradient(900px 600px at 90% 20%, rgba(255,255,255,0.55), rgba(255,255,255,0)),
@@ -75,88 +75,92 @@
       padding: 18px 16px;
     }
 
-    h2 {
+    h2{
       margin: 18px 0 10px;
       font-size: 16px;
-      color: rgba(45,111,134,0.95);
-      border-left: 4px solid rgba(45,111,134,0.55);
+      color: rgba(43,43,43,0.9);
+      border-left: 4px solid rgba(45,111,134,0.65);
       padding-left: 10px;
-      letter-spacing: 0.04em;
     }
 
-    label {
-      display: block;
+    label{
+      display:block;
       margin-top: 14px;
       font-weight: 700;
       font-size: 14px;
-      color: rgba(43,43,43,0.88);
+      color: rgba(43,43,43,0.9);
     }
 
-    .hint{
-      margin-top: 6px;
-      font-size: 12px;
-      color: var(--muted);
-      line-height: 1.5;
-    }
-
-    input[type="text"],
-    textarea,
-    select,
-    input[type="file"] {
+    input[type="text"], textarea, select, input[type="file"]{
       width: 100%;
-      padding: 12px;
+      margin-top: 8px;
+      padding: 12px 12px;
       font-size: 16px;
       border-radius: 12px;
       border: 1px solid rgba(0,0,0,0.12);
-      margin-top: 8px;
-      background: var(--card2);
+      background: rgba(255,255,255,0.9);
       outline: none;
+    }
+
+    input[type="file"]{
+      padding: 10px;
+      background: rgba(255,255,255,0.88);
     }
 
     textarea { resize: vertical; }
 
-    .checkbox-group {
+    .hint{
+      font-size: 12px;
+      color: rgba(43,43,43,0.7);
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+
+    .checkbox-group{
       margin-top: 10px;
       padding: 10px 10px 2px;
-      border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(45,111,134,0.12);
       background: rgba(255,255,255,0.55);
     }
 
-    .checkbox-group label {
+    .checkbox-group label{
       display: flex;
       align-items: center;
       gap: 10px;
       margin: 0 0 10px;
       font-weight: 600;
       font-size: 14px;
-      color: rgba(43,43,43,0.86);
+      color: rgba(43,43,43,0.88);
     }
 
-    .checkbox-group input[type="checkbox"] {
-      transform: scale(1.2);
+    .checkbox-group input[type="checkbox"]{
+      width: 18px;
+      height: 18px;
+      accent-color: rgba(45,111,134,0.9);
     }
 
-    .actions {
+    .actions{
       margin-top: 18px;
     }
 
-    button[type="submit"] {
+    button[type="submit"]{
       width: 100%;
       padding: 14px;
-      background: linear-gradient(135deg, rgba(45,111,134,0.92), rgba(184,138,122,0.88));
+      border: none;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(45,111,134,0.95), rgba(184,138,122,0.92));
       color: #fff;
       font-size: 16px;
       font-weight: 800;
-      border: none;
-      border-radius: 14px;
+      letter-spacing: 0.06em;
       cursor: pointer;
-      box-shadow: 0 10px 20px rgba(45,111,134,0.18);
+      box-shadow: 0 10px 24px rgba(0,0,0,0.12);
     }
+
     button[type="submit"]:disabled{
-      opacity: 0.6;
+      opacity: 0.7;
       cursor: not-allowed;
-      box-shadow: none;
     }
 
     .result {
@@ -311,8 +315,14 @@
           <label><input type="checkbox" name="vibe" value="自分らしく"> 自分らしく</label>
         </div>
 
-        <label for="avoid_colors">苦手・避けたいテイストやカラー（自由記述）</label>
-        <textarea id="avoid_colors" name="avoid_colors" rows="3" placeholder="例：派手な赤、ラメ、黒系が苦手..."></textarea>
+        <!-- ★ここだけ「自由要望」に変更（nameは avoid_colors のまま） -->
+        <label for="avoid_colors">自由入力のご要望（雰囲気/色味/NG/やってみたいこと等）</label>
+        <textarea
+          id="avoid_colors"
+          name="avoid_colors"
+          rows="3"
+          placeholder="例：手が綺麗に見える感じがいい／青み寄りも挑戦したい／派手すぎは苦手／オフィスOKで…など"
+        ></textarea>
 
         <div class="actions">
           <button type="submit">送信する</button>

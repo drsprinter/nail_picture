@@ -292,11 +292,17 @@ Chosen nail plan (Japanese, for reference only):
         image_error = None
 
         try:
-            img_res = client.images.generate(
+            # Image edit endpoint (required when using an input image)
+            # The Python SDK expects a file-like object for `image`
+            img_file = io.BytesIO(img_bytes)
+            img_file.name = "nails.png"
+
+            img_res = client.images.edit(
                 model="gpt-image-1",
+                image=img_file,
                 prompt=edit_prompt,
-                image=img_b64,
-                size="1024x1024"
+                size="1024x1024",
+                n=1
             )
 
             b64 = getattr(img_res.data[0], "b64_json", None)

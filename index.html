@@ -134,7 +134,8 @@
       color: rgba(43,43,43,0.88);
     }
 
-    .checkbox-group input[type="checkbox"]{
+    .checkbox-group input[type="checkbox"],
+    .checkbox-group input[type="radio"]{
       width: 18px;
       height: 18px;
       accent-color: rgba(45,111,134,0.9);
@@ -313,6 +314,46 @@
           <label><input type="checkbox" name="vibe" value="クール"> クール</label>
           <label><input type="checkbox" name="vibe" value="トレンド感"> トレンド感ある</label>
           <label><input type="checkbox" name="vibe" value="自分らしく"> 自分らしく</label>
+        </div>
+
+
+        <h2>あなたらしさ（任意）</h2>
+        <div class="hint">※ 迷ったら空欄のままでもOKです。よりフィットした提案にするための項目です。</div>
+
+        <label>今日はどれくらい挑戦したい？</label>
+        <div class="checkbox-group">
+          <label><input type="radio" name="challenge_level" value="10(ほぼいつも通り)"> ほぼいつも通り</label>
+          <label><input type="radio" name="challenge_level" value="30(ちょい変化)"> ちょい変化</label>
+          <label><input type="radio" name="challenge_level" value="60(いつもより攻めたい)"> いつもより攻めたい</label>
+          <label><input type="radio" name="challenge_level" value="80(新しい自分に寄せたい)"> 新しい自分に寄せたい</label>
+        </div>
+
+        <label for="outfit_style">普段の服のテイスト</label>
+        <select id="outfit_style" name="outfit_style">
+          <option value="">選択してください</option>
+          <option value="ベーシック/きれいめ">ベーシック/きれいめ</option>
+          <option value="カジュアル">カジュアル</option>
+          <option value="フェミニン">フェミニン</option>
+          <option value="モード/クール">モード/クール</option>
+          <option value="トレンド/韓国っぽ">トレンド/韓国っぽ</option>
+          <option value="日によってバラバラ">日によってバラバラ</option>
+        </select>
+
+        <label>ネイルで一番大事なのは？</label>
+        <div class="checkbox-group">
+          <label><input type="radio" name="top_priority" value="仕事/生活で浮かない"> 仕事/生活で浮かない</label>
+          <label><input type="radio" name="top_priority" value="手元がきれいに見える"> 手元がきれいに見える</label>
+          <label><input type="radio" name="top_priority" value="気分が上がる"> 気分が上がる</label>
+          <label><input type="radio" name="top_priority" value="周りに褒められたい"> 周りに褒められたい</label>
+          <label><input type="radio" name="top_priority" value="写真映え"> 写真映え</label>
+        </div>
+
+        <label>華やかさ（ワンポイント）はどんな感じが好き？</label>
+        <div class="checkbox-group">
+          <label><input type="radio" name="accent_preference" value="近くで見ると分かるくらい（繊細）"> 近くで見ると分かるくらい（繊細）</label>
+          <label><input type="radio" name="accent_preference" value="ぱっと見で可愛い（分かりやすい）"> ぱっと見で可愛い（分かりやすい）</label>
+          <label><input type="radio" name="accent_preference" value="指先だけ強め（フレンチ/先端）"> 指先だけ強め（フレンチ/先端）</label>
+          <label><input type="radio" name="accent_preference" value="1〜2本だけ遊びたい（アクセント爪）"> 1〜2本だけ遊びたい（アクセント爪）</label>
         </div>
 
         <!-- ★ここだけ「自由要望」に変更（nameは avoid_colors のまま） -->

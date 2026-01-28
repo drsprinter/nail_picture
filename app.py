@@ -177,10 +177,7 @@ def makeup():
         if not candidates:
             candidates = [{
                 "id": "A",
-                "plan_ja": "【ネイルコンセプト】
-（プラン生成に失敗しました）
-【デザイン詳細】
-（もう一度お試しください）",
+                "plan_ja": "【ネイルコンセプト】\n（プラン生成に失敗しました）\n【デザイン詳細】\n（もう一度お試しください）",
                 "style_hint": "fallback"
             }]
 

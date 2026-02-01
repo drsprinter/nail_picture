@@ -373,6 +373,18 @@
       </form>
     </div>
 
+    
+    <div class="result" id="followup" style="display:none;">
+      <h2>あと1つだけ教えてください</h2>
+      <div class="hint" id="followupHint">よりあなたにフィットする提案にするための質問です。</div>
+      <div id="followupQ" style="margin-top:12px; font-weight:800;"></div>
+      <div class="checkbox-group" id="followupOptions" style="margin-top:10px;"></div>
+      <div class="actions">
+        <button id="followupSubmit" type="button">回答して続ける</button>
+      </div>
+      <div class="error" id="followupError" style="display:none;"></div>
+    </div>
+
     <div class="result" id="result">
       <h2>あなたのネイルプラン</h2>
       <pre id="planText"></pre>
@@ -392,7 +404,8 @@
   </div>
 
   <script>
-    const API_URL = "https://makeup-enz8.onrender.com/api/makeup";
+    const API_START_URL = "https://makeup-enz8.onrender.com/api/game/start";
+    const API_ANSWER_URL = "https://makeup-enz8.onrender.com/api/game/answer";
 
     const form = document.getElementById("nailForm");
     const popup = document.getElementById("loadingPopup");
@@ -403,6 +416,51 @@
     const nailImage = document.getElementById("nailImage");
     const imgHint = document.getElementById("imgHint");
     const imageErrorBox = document.getElementById("imageErrorBox");
+
+
+    // --- Bayesian game follow-up ---
+    const followupDiv = document.getElementById("followup");
+    const followupQ = document.getElementById("followupQ");
+    const followupOptions = document.getElementById("followupOptions");
+    const followupSubmit = document.getElementById("followupSubmit");
+    const followupError = document.getElementById("followupError");
+
+    let sessionToken = null;
+    let pendingQuestionId = null;
+
+    function showFollowupError(msg){
+      followupError.style.display = "block";
+      followupError.textContent = msg;
+    }
+    function clearFollowupError(){
+      followupError.style.display = "none";
+      followupError.textContent = "";
+    }
+
+    function renderFollowup(question){
+      pendingQuestionId = question.id;
+      followupQ.textContent = question.text;
+      followupOptions.innerHTML = "";
+
+      question.options.forEach((opt) => {
+        const lab = document.createElement("label");
+        const input = document.createElement("input");
+        input.type = "radio";
+        input.name = "followup_choice";
+        input.value = opt.value;
+        input.required = true;
+
+        lab.appendChild(input);
+        const span = document.createElement("span");
+        span.textContent = opt.label;
+        lab.appendChild(span);
+
+        followupOptions.appendChild(lab);
+      });
+
+      followupDiv.style.display = "block";
+      followupDiv.scrollIntoView({behavior:"smooth", block:"start"});
+    }
 
     function showError(msg){
       errorBox.style.display = "block";
@@ -441,7 +499,7 @@
         // ★重要：multipart/form-data で送る（headersは付けない）
         const fd = new FormData(form);
 
-        const response = await fetch(API_URL, {
+        const response = await fetch(API_START_URL, {
           method: "POST",
           body: fd
         });
@@ -458,6 +516,16 @@
 
         if (!response.ok) {
           showError("エラーが発生しました: " + (result.error || "不明なエラー"));
+          return;
+        }
+
+
+        if (result && result.status === "need_more") {
+          sessionToken = result.token;
+          hideLoading();
+          submitBtn.disabled = false;
+          submitBtn.textContent = "送信する";
+          renderFollowup(result.question);
           return;
         }
 
@@ -491,6 +559,81 @@
         submitBtn.disabled = false;
         submitBtn.textContent = "送信する";
         showError("サーバーとの通信に失敗しました: " + err);
+      }
+    });
+
+
+    followupSubmit.addEventListener("click", async () => {
+      clearFollowupError();
+      if (!sessionToken || !pendingQuestionId) {
+        showFollowupError("セッションが見つかりません。もう一度送信してください。");
+        return;
+      }
+
+      const choice = followupOptions.querySelector('input[name="followup_choice"]:checked');
+      if (!choice) {
+        showFollowupError("選択してください。");
+        return;
+      }
+
+      showLoading();
+      followupSubmit.disabled = true;
+      followupSubmit.textContent = "送信中...";
+
+      try {
+        const fd2 = new FormData();
+        fd2.append("token", sessionToken);
+        fd2.append("question_id", pendingQuestionId);
+        fd2.append("answer", choice.value);
+
+        const response2 = await fetch(API_ANSWER_URL, {
+          method: "POST",
+          body: fd2
+        });
+
+        const text2 = await response2.text();
+        let result2;
+        try { result2 = JSON.parse(text2); }
+        catch { result2 = { error: "サーバー応答がJSONではありません", raw: text2 }; }
+
+        hideLoading();
+        followupSubmit.disabled = false;
+        followupSubmit.textContent = "回答して続ける";
+
+        if (!response2.ok) {
+          showFollowupError("エラーが発生しました: " + (result2.error || "不明なエラー"));
+          return;
+        }
+
+        followupDiv.style.display = "none";
+
+        planText.textContent = result2.plan || "(プランが取得できませんでした)";
+        resultDiv.style.display = "block";
+
+        if (result2.image_data_url) {
+          nailImage.src = result2.image_data_url;
+          nailImage.style.display = "block";
+          imgHint.style.display = "block";
+        } else {
+          nailImage.style.display = "none";
+          imgHint.style.display = "none";
+        }
+
+        if (result2.image_error) {
+          imageErrorBox.style.display = "block";
+          imageErrorBox.textContent = "画像生成エラー: " + result2.image_error;
+        } else {
+          imageErrorBox.style.display = "none";
+          imageErrorBox.textContent = "";
+        }
+
+        resultDiv.scrollIntoView({behavior:"smooth", block:"start"});
+
+      } catch (err) {
+        hideLoading();
+        followupSubmit.disabled = false;
+        followupSubmit.textContent = "回答して続ける";
+        showFollowupError("サーバーとの通信に失敗しました: " + err);
       }
     });
   </script>

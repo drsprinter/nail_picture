@@ -17,6 +17,10 @@ CORS(app, origins=[
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+# =========================================================
+# 0) Utilities
+# =========================================================
+
 def safe_extract_json(text: str) -> dict:
     t = (text or "").strip()
     if t.startswith("```"):
@@ -65,7 +69,165 @@ def normalize(weights: list) -> list:
         return [1.0 / n for _ in range(n)]
     return [w / s for w in weights]
 
-# --- Type space (user's private preference type θ) ---
+# =========================================================
+# 1) Nailist Personas (A/B/C)
+#    ★ここをヒヤリング結果で埋める（最重要）
+# =========================================================
+# A: 安全・上品・日常適合を最優先（保守派）
+# B: 上品なトレンド編集（今っぽさ重視）
+# C: ワンポイントで新鮮（アートディレクター）
+NAILIST_PERSONAS = {
+    "A": {
+        "persona_id": "conservative_elegant",
+        "display_name": "保守上品派",
+        "tagline": "失敗しない上品さ。肌なじみと清潔感で手元を格上げ。",
+        "voice": {
+            "tone": "丁寧・安心感・控えめに背中を押す",
+            "style_keywords": ["上品", "清潔感", "肌なじみ", "透明感", "ツヤ"],
+            "avoid_phrases": ["ゴテゴテ", "盛る", "派手すぎ"]
+        },
+        "design_policy": {
+            "signature_moves": [
+                "透け感ベース＋微細ラメで清潔感",
+                "先端にだけほんのりニュアンス",
+                "ストーンは1粒レベルで上品"
+            ],
+            "taboo": [
+                "avoid_colorsに触れる色",
+                "強すぎる原色やネオン",
+                "3Dや過度な盛り"
+            ],
+            "accent_rules": {
+                "max_accent_nails": 1,
+                "accent_types_preferred": ["micro_glitter", "subtle_stone", "thin_line", "french_tip"],
+                "accent_intensity": 0.25
+            }
+        },
+        "params": {
+            "risk": 0.25,
+            "daily_fit": 0.90,
+            "trend": 0.40,
+            "minimal": 0.80,
+            "sparkle": 0.25,
+            "vivid": 0.45,
+            "safety": 0.90
+        }
+    },
+    "B": {
+        "persona_id": "trend_editor",
+        "display_name": "上品トレンド派",
+        "tagline": "盛らずに垢抜け。上品のまま今っぽく。",
+        "voice": {
+            "tone": "テンポよく・前向き・おしゃれ編集者",
+            "style_keywords": ["トレンド", "うる艶", "抜け感", "ニュアンス", "洗練"],
+            "avoid_phrases": ["古い", "無難すぎ", "手抜き"]
+        },
+        "design_policy": {
+            "signature_moves": [
+                "マグネット/うる艶系を控えめに",
+                "今っぽいシアーカラーで透明感",
+                "微細ラメを“線”や“先端”で効かせる"
+            ],
+            "taboo": [
+                "avoid_colorsに触れる色",
+                "色数が多すぎて散らかる",
+                "トレンドの押し付け"
+            ],
+            "accent_rules": {
+                "max_accent_nails": 2,
+                "accent_types_preferred": ["magnet", "micro_glitter", "sheer_gloss", "one_nail_accent"],
+                "accent_intensity": 0.40
+            }
+        },
+        "params": {
+            "risk": 0.55,
+            "daily_fit": 0.70,
+            "trend": 0.95,
+            "minimal": 0.55,
+            "sparkle": 0.40,
+            "vivid": 0.60,
+            "safety": 0.70
+        }
+    },
+    "C": {
+        "persona_id": "art_director",
+        "display_name": "ワンポイントアート派",
+        "tagline": "ワンポイントで新しい自分。上品な遊び心で差をつける。",
+        "voice": {
+            "tone": "クリエイティブ・具体的・提案が明快",
+            "style_keywords": ["アクセント", "余白", "ライン", "配置", "個性"],
+            "avoid_phrases": ["なんとなく", "適当", "盛り盛り"]
+        },
+        "design_policy": {
+            "signature_moves": [
+                "1〜2本だけ意図のあるアクセント配置",
+                "先端/ライン/小さなアートで新鮮さ",
+                "色は増やしすぎず“配置”で攻める"
+            ],
+            "taboo": [
+                "avoid_colorsに触れる色",
+                "全面アートで重くなる",
+                "統一感のない柄の乱用"
+            ],
+            "accent_rules": {
+                "max_accent_nails": 2,
+                "accent_types_preferred": ["thin_line", "abstract_art", "french_tip", "one_nail_art", "subtle_stone"],
+                "accent_intensity": 0.45
+            }
+        },
+        "params": {
+            "risk": 0.60,
+            "daily_fit": 0.60,
+            "trend": 0.65,
+            "minimal": 0.55,
+            "sparkle": 0.35,
+            "vivid": 0.65,
+            "safety": 0.65
+        }
+    }
+}
+
+def build_persona_candidate_prompt(candidate_id: str, persona: dict, user_text: str, selected_summary: dict) -> str:
+    """
+    ペルソナ注入版：候補1つだけ生成（A/B/Cを別々に呼ぶ）
+    """
+    return f"""
+あなたはプロのネイリストです。以下の「ネイリストのペルソナ」に厳密に従って、
+お客様に合うネイル提案を【1案】だけ作ってください。
+
+【ネイリストのペルソナ（必ず従う）】
+{json.dumps(persona, ensure_ascii=False)}
+
+【絶対条件（Hard constraints）】
+- お客様の選択項目（vibe / purpose / avoid_colors / nail_duration / age）を最優先に踏襲（これが最上位）
+- 奇抜すぎない：新しさは80%程度（新しい自分を発見できるが上品で現実的）
+- 日常へ馴染むかどうかは選択項目に応じて適切に調整（仕事寄りなら控えめ、イベント寄りなら少し遊ぶ）
+- ベージュ単色に寄りすぎない（程よく鮮やかさ・血色・透明感を入れる）
+- ストーン/ラメ/アートは回答に応じて適切に。華やかさは“ワンポイント”で上品に
+- avoid_colors（自由入力）はNG/苦手が含まれる可能性があるため、踏まないこと
+
+【この案の役割】
+- id="{candidate_id}" の案として、ペルソナらしさが最も出る方向で提案する
+- ただし上の絶対条件は必ず守る
+
+【出力（JSONのみ）】
+{{
+  "id": "{candidate_id}",
+  "plan_ja": "【ネイルコンセプト】...\\n【デザイン詳細】...",
+  "style_hint": "内部用の短いメモ（ペルソナらしさ/狙い）"
+}}
+
+【お客様情報（そのまま）】
+{user_text}
+
+【お客様の選択項目サマリ（最優先）】
+{json.dumps(selected_summary, ensure_ascii=False)}
+""".strip()
+
+# =========================================================
+# 2) Type space (user's private preference type θ)
+# =========================================================
+
 TYPE_SPACE = [
     {"id": "T1", "name": "work_minimal",    "t": {"risk":0.15,"sparkle":0.15,"minimal":0.85,"trend":0.35,"daily":0.95,"vivid":0.30}},
     {"id": "T2", "name": "elegant_trend",   "t": {"risk":0.45,"sparkle":0.30,"minimal":0.65,"trend":0.80,"daily":0.70,"vivid":0.55}},
@@ -185,28 +347,28 @@ def likelihood(question_id: str, answer_value: str, theta: dict, form: dict) -> 
         if "繊細" in answer_value:
             s = 0.15 + 0.85 * (0.6*t["minimal"] + 0.4*(1.0-t["sparkle"]))
         elif "分かりやすい" in answer_value:
-            s = 0.15 + 0.85 * (0.55*t["sparkle"] + 0.45*t["vivid"])
+            s = 0.15 + 0.85 * (0.55*t["sparkle"] + 0.45*t["vivid"]))
         elif "先端" in answer_value:
-            s = 0.15 + 0.85 * (0.5*t["minimal"] + 0.5*t["trend"])
+            s = 0.15 + 0.85 * (0.5*t["minimal"] + 0.5*t["trend"]))
         elif "アクセント爪" in answer_value:
-            s = 0.15 + 0.85 * (0.55*t["risk"] + 0.45*t["trend"])
+            s = 0.15 + 0.85 * (0.55*t["risk"] + 0.45*t["trend"]))
         else:
             s = 0.2
         return clamp01(s)
 
     if question_id == "outfit_style":
         if "きれいめ" in answer_value:
-            s = 0.15 + 0.85 * (0.55*t["minimal"] + 0.45*t["daily"])
+            s = 0.15 + 0.85 * (0.55*t["minimal"] + 0.45*t["daily"]))
         elif "カジュアル" in answer_value:
-            s = 0.15 + 0.85 * (0.45*t["daily"] + 0.55*(1.0-abs(t["vivid"]-0.6)))
+            s = 0.15 + 0.85 * (0.45*t["daily"] + 0.55*(1.0-abs(t["vivid"]-0.6))))
         elif "フェミニン" in answer_value:
-            s = 0.15 + 0.85 * (0.55*t["vivid"] + 0.45*t["sparkle"])
+            s = 0.15 + 0.85 * (0.55*t["vivid"] + 0.45*t["sparkle"]))
         elif "モード" in answer_value:
-            s = 0.15 + 0.85 * (0.65*t["trend"] + 0.35*(1.0-t["sparkle"]))
+            s = 0.15 + 0.85 * (0.65*t["trend"] + 0.35*(1.0-t["sparkle"])))
         elif "韓国" in answer_value:
-            s = 0.15 + 0.85 * (0.75*t["trend"] + 0.25*t["vivid"])
+            s = 0.15 + 0.85 * (0.75*t["trend"] + 0.25*t["vivid"]))
         elif "バラバラ" in answer_value:
-            s = 0.25 + 0.75 * (0.5*t["risk"] + 0.5*t["trend"])
+            s = 0.25 + 0.75 * (0.5*t["risk"] + 0.5*t["trend"]))
         else:
             s = 0.2
         return clamp01(s)
@@ -255,6 +417,10 @@ def choose_next_question(posterior: list, form: dict):
     q = QUESTIONS[best["qid"]]
     return {"id": best["qid"], "text": q["text"], "options": q["options"], "required": True}
 
+# =========================================================
+# 3) Candidate evaluation / selection (same as before)
+# =========================================================
+
 AXES = [
     "adherence_to_selections",
     "wearability_daily_fit",
@@ -298,6 +464,10 @@ def pick_by_expected_utility(candidates: list, eval_payload: dict, posterior: li
             best = {"candidate": c, "eval": r, "eu": eu, "tup": tup}
     return best or {"candidate": candidates[0] if candidates else {}, "eval": {}, "eu": 0.0, "tup": (0.0, 0.0)}
 
+# =========================================================
+# 4) Sessions
+# =========================================================
+
 SESSIONS = {}
 SESSION_TTL_SEC = 10 * 60
 
@@ -306,6 +476,10 @@ def cleanup_sessions():
     dead = [k for k, v in SESSIONS.items() if now - v.get("created", now) > SESSION_TTL_SEC]
     for k in dead:
         SESSIONS.pop(k, None)
+
+# =========================================================
+# 5) Routes
+# =========================================================
 
 @app.route("/api/game/start", methods=["POST", "OPTIONS"])
 def game_start():
@@ -375,6 +549,10 @@ def game_answer():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# =========================================================
+# 6) Main finalize
+# =========================================================
+
 def finalize_with_posterior(img_bytes: bytes, form: dict, posterior: list):
     user_text = build_user_text(form)
 
@@ -390,52 +568,43 @@ def finalize_with_posterior(img_bytes: bytes, form: dict, posterior: list):
         "accent_preference": form.get("accent_preference", "")
     }
 
-    candidates_prompt = f"""
-あなたはプロのネイリストです。
-以下の「お客様の選択項目」を最優先に踏襲しつつ、ネイル提案を【3案】作ってください。
-この3案は、方向性が被らないように“自然な幅”をつけてください（奇抜はNG）。
+    # -----------------------------------------------------
+    # (1) Generate 3 candidates separately using personas
+    # -----------------------------------------------------
+    candidates = []
+    for cid in ["A", "B", "C"]:
+        persona = NAILIST_PERSONAS.get(cid, {})
+        prompt = build_persona_candidate_prompt(cid, persona, user_text, selected_summary)
 
-絶対条件（Hard constraints）：
-- お客様の選択項目（vibe / purpose / avoid_colors / nail_duration / age）を最優先に踏襲
-- 奇抜すぎない：新しさは80%程度（新しい自分を発見できるが上品で現実的）
-- 日常へ馴染むかどうかは選択項目に応じて適切に調整（仕事寄りなら控えめ、イベント寄りなら少し遊ぶ）
-- ベージュ単色に寄りすぎない（程よく鮮やかさ・血色・透明感を入れる）
-- ストーン/ラメ/アートは回答に応じて適切に。華やかさは“ワンポイント”で上品に
+        res = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "あなたはトップネイルアーティストです。必ずJSONのみを返してください。"},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.65
+        )
 
-3案の役割（必ず守る）：
-- A：一番外さない（上品・日常適合が高い）
-- B：一番“今っぽい”/トレンド寄り（ただし上品・現実的）
-- C：アクセントの置き方が新鮮（1〜2本 or 先端など、ワンポイントで攻める）
+        try:
+            payload = safe_extract_json(res.choices[0].message.content)
+            # minimal validation
+            if payload.get("id") != cid:
+                payload["id"] = cid
+            if not payload.get("plan_ja"):
+                payload["plan_ja"] = "【ネイルコンセプト】\n（生成に失敗しました）\n【デザイン詳細】\n（もう一度お試しください）"
+            if "style_hint" not in payload:
+                payload["style_hint"] = f"persona:{persona.get('persona_id','unknown')}"
+            candidates.append(payload)
+        except Exception:
+            candidates.append({
+                "id": cid,
+                "plan_ja": "【ネイルコンセプト】\n（プラン生成に失敗しました）\n【デザイン詳細】\n（もう一度お試しください）",
+                "style_hint": f"fallback persona:{persona.get('persona_id','unknown')}"
+            })
 
-出力は【JSONのみ】（必ず有効なJSON。説明文なし）：
-{{
-  "candidates": [
-    {{"id":"A","plan_ja":"【ネイルコンセプト】...\\n【デザイン詳細】...","style_hint":"..."}},
-    {{"id":"B","plan_ja":"...","style_hint":"..."}},
-    {{"id":"C","plan_ja":"...","style_hint":"..."}}
-  ]
-}}
-
-お客様情報（そのまま）：
-{user_text}
-
-お客様の選択項目サマリ（最優先）：
-{json.dumps(selected_summary, ensure_ascii=False)}
-""".strip()
-
-    cand_res = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "あなたはトップネイルアーティストです。"},
-            {"role": "user", "content": candidates_prompt}
-        ],
-        temperature=0.65
-    )
-    cand_payload = safe_extract_json(cand_res.choices[0].message.content)
-    candidates = cand_payload.get("candidates") or []
-    if not candidates:
-        candidates = [{"id":"A","plan_ja":"【ネイルコンセプト】\n（プラン生成に失敗しました）\n【デザイン詳細】\n（もう一度お試しください）","style_hint":"fallback"}]
-
+    # -----------------------------------------------------
+    # (2) Evaluate candidates (same as before)
+    # -----------------------------------------------------
     eval_prompt = f"""
 あなたはネイル提案の品質評価者です。
 下の「お客様の選択項目」と「候補3案」を読み、各案を0〜100点で採点してください。
@@ -454,7 +623,9 @@ def finalize_with_posterior(img_bytes: bytes, form: dict, posterior: list):
 出力は【JSONのみ】：
 {{
   "results": [
-    {{"id":"A","scores":{{"adherence_to_selections":0,"wearability_daily_fit":0,"novelty_target_80":0,"colorfulness_not_beige_only":0,"accent_fit_one_point":0}},"notes":"..."}}
+    {{"id":"A","scores":{{"adherence_to_selections":0,"wearability_daily_fit":0,"novelty_target_80":0,"colorfulness_not_beige_only":0,"accent_fit_one_point":0}},"notes":"..."}},
+    {{"id":"B","scores":{{"adherence_to_selections":0,"wearability_daily_fit":0,"novelty_target_80":0,"colorfulness_not_beige_only":0,"accent_fit_one_point":0}},"notes":"..."}},
+    {{"id":"C","scores":{{"adherence_to_selections":0,"wearability_daily_fit":0,"novelty_target_80":0,"colorfulness_not_beige_only":0,"accent_fit_one_point":0}},"notes":"..."}}
   ]
 }}
 
@@ -478,6 +649,9 @@ def finalize_with_posterior(img_bytes: bytes, form: dict, posterior: list):
     picked = pick_by_expected_utility(candidates, eval_payload, posterior)
     plan_text = (picked.get("candidate") or {}).get("plan_ja") or candidates[0].get("plan_ja", "")
 
+    # -----------------------------------------------------
+    # (3) Build English image-edit prompt (same as before)
+    # -----------------------------------------------------
     spec_prompt = f"""
 You are a top nail artist who writes image-edit prompts.
 
@@ -524,6 +698,9 @@ Chosen nail plan (Japanese, for reference only):
             "No text, no watermark."
         )
 
+    # -----------------------------------------------------
+    # (4) Image edit (same as before)
+    # -----------------------------------------------------
     image_data_url = None
     image_error = None
     try:
@@ -561,6 +738,7 @@ Chosen nail plan (Japanese, for reference only):
             "posterior_top3": top,
             "picked_expected_utility": picked.get("eu"),
             "picked_id": (picked.get("candidate") or {}).get("id"),
+            "candidates_debug": candidates
         }
     })
 

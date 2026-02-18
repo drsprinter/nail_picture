@@ -12,23 +12,46 @@
   "design_policy": {
     "must_keep": [
       "Keep customer's selected options first: vibe, purpose, avoid_colors, nail_duration, age",
-      "Edit only nails (when generating image prompt later)",
-      "Not overly eccentric; ~80% freshness"
+      "Not overly eccentric; aim for ~80% freshness (discover a new side but wearable)",
+      "Adjust daily-fit depending on purpose (work/daily=subtle, event=slightly playful but elegant)",
+      "Do not lean too heavily toward plain beige monochrome; keep it moderately vivid and lively",
+      "Use stones/glitter/art appropriately with ONE tasteful accent point"
     ],
+
     "signature_moves": [
-      "透け感カラー＋微細ラメ",
-      "先端だけほんのりニュアンス",
-      "1本だけ品よくアクセント"
+      "Sheer / milky base with 'churun' glossy finish to make hands look clean and beautiful",
+      "Gradient or jelly-like translucency (soft ombre) to add depth without looking heavy",
+      "Modern French variations: thin French, diagonal French, glitter French, color French (kept elegant)",
+      "Micro-glitter / aurora / subtle magnetic shine used softly (never too flashy)",
+      "Fine mirror/metallic line accents to sharpen the look while keeping it minimal",
+      "One-nail (or max two nails) accent: bijou/stone, small charm, or delicate art as a focal point",
+      "When using motifs/characters, limit color count and keep the overall palette cohesive and clean"
     ],
+
     "taboo": [
-      "avoid_colorsに触れる色",
-      "3D盛りすぎストーン",
-      "色数が多すぎて散らかる"
+      "Overloaded decoration on all nails (too many stones, heavy glitter, 3D everywhere)",
+      "Too many colors with no cohesion (scattered look)",
+      "Neon / overly saturated primary colors used as full coverage without balance",
+      "Flat heavy matte finish across all nails (prefers glossy / sheer look)",
+      "Solid black full set without design intent (black is fine as an accent/art element)"
     ],
+
     "accent_rules": {
-      "max_accent_nails": 5,
-      "accent_types_preferred": ["hand drawing art","micro_glitter", "subtle_stone", "thin_line", "french_tip","seal symbol"],
-      "accent_intensity": 0.35
+      "max_accent_nails": 2,
+      "accent_types_preferred": [
+        "micro_glitter",
+        "aurora",
+        "magnet",
+        "mirror_line",
+        "thin_french",
+        "subtle_stone",
+        "bijou_one_nail",
+        "small_charm",
+        "minimal_art",
+	"hand drawing art"
+      ],
+      "accent_intensity": 0.40,
+      "placement_notes": "Either 'one focal point' (bijou on 1 nail) OR 'soft distributed shine' (micro glitter/aurora on multiple nails), but avoid half-hearted scattered accents."
     }
   },
 
@@ -43,9 +66,9 @@
   },
 
   "color_direction": {
-    "base_palette_notes": "肌なじみ系を土台に、血色・透明感を足す",
-    "allowed_accents_notes": "フレンチネイルで原色アクセント、くすみピンク、モーヴ、シアーブラウン、青みラメ少量",
-    "avoid_palette_notes": "盛りすぎドカン、ネオン、濃すぎ黒ベタ"
+    "base_palette_notes": "Milky white, sheer beige, greige, dusty pink, soft mauve, light gray, pale blue. Prioritize translucency and hand-brightening tones.",
+    "allowed_accents_notes": "Silver/gold mirror lines, aurora/iridescent shine, subtle magnetic shimmer. Navy/blue as a clean 'tightening' color. Burgundy/red for seasonal/event moods (kept elegant).",
+    "avoid_palette_notes": "Neon full coverage, overly saturated primary colors without balance, muddy/dark heavy full-coverage sets that lose translucency."
   },
 
   "format_constraints": {

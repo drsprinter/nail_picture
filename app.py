@@ -319,56 +319,61 @@ QUESTIONS = {
 
 def likelihood(question_id: str, answer_value: str, theta: dict, form: dict) -> float:
     t = theta["t"]
+
     if question_id == "challenge_level":
         target = 0.3
-        if answer_value.startswith("10"): target = 0.15
-        elif answer_value.startswith("30"): target = 0.35
-        elif answer_value.startswith("60"): target = 0.65
-        elif answer_value.startswith("80"): target = 0.80
+        if answer_value.startswith("10"):
+            target = 0.15
+        elif answer_value.startswith("30"):
+            target = 0.35
+        elif answer_value.startswith("60"):
+            target = 0.65
+        elif answer_value.startswith("80"):
+            target = 0.80
         d = abs(t["risk"] - target)
         return 0.10 + 0.90 * math.exp(-4.0 * d)
 
     if question_id == "top_priority":
         if answer_value == "仕事/生活で浮かない":
-            s = 0.15 + 0.85 * (0.7*t["daily"] + 0.3*t["minimal"])
+            s = 0.15 + 0.85 * (0.7 * t["daily"] + 0.3 * t["minimal"])
         elif answer_value == "手元がきれいに見える":
-            s = 0.15 + 0.85 * (0.6*t["minimal"] + 0.4*(1.0-abs(t["vivid"]-0.55)))
+            s = 0.15 + 0.85 * (0.6 * t["minimal"] + 0.4 * (1.0 - abs(t["vivid"] - 0.55)))
         elif answer_value == "気分が上がる":
-            s = 0.15 + 0.85 * (0.5*t["vivid"] + 0.5*t["risk"])
+            s = 0.15 + 0.85 * (0.5 * t["vivid"] + 0.5 * t["risk"])
         elif answer_value == "周りに褒められたい":
-            s = 0.15 + 0.85 * (0.6*t["trend"] + 0.4*t["sparkle"])
+            s = 0.15 + 0.85 * (0.6 * t["trend"] + 0.4 * t["sparkle"])
         elif answer_value == "写真映え":
-            s = 0.15 + 0.85 * (0.6*t["trend"] + 0.4*t["vivid"])
+            s = 0.15 + 0.85 * (0.6 * t["trend"] + 0.4 * t["vivid"])
         else:
             s = 0.2
         return clamp01(s)
 
     if question_id == "accent_preference":
         if "繊細" in answer_value:
-            s = 0.15 + 0.85 * (0.6*t["minimal"] + 0.4*(1.0-t["sparkle"]))
+            s = 0.15 + 0.85 * (0.6 * t["minimal"] + 0.4 * (1.0 - t["sparkle"]))
         elif "分かりやすい" in answer_value:
-            s = 0.15 + 0.85 * (0.55*t["sparkle"] + 0.45*t["vivid"]))
+            s = 0.15 + 0.85 * (0.55 * t["sparkle"] + 0.45 * t["vivid"])
         elif "先端" in answer_value:
-            s = 0.15 + 0.85 * (0.5*t["minimal"] + 0.5*t["trend"]))
+            s = 0.15 + 0.85 * (0.5 * t["minimal"] + 0.5 * t["trend"])
         elif "アクセント爪" in answer_value:
-            s = 0.15 + 0.85 * (0.55*t["risk"] + 0.45*t["trend"]))
+            s = 0.15 + 0.85 * (0.55 * t["risk"] + 0.45 * t["trend"])
         else:
             s = 0.2
         return clamp01(s)
 
     if question_id == "outfit_style":
         if "きれいめ" in answer_value:
-            s = 0.15 + 0.85 * (0.55*t["minimal"] + 0.45*t["daily"]))
+            s = 0.15 + 0.85 * (0.55 * t["minimal"] + 0.45 * t["daily"])
         elif "カジュアル" in answer_value:
-            s = 0.15 + 0.85 * (0.45*t["daily"] + 0.55*(1.0-abs(t["vivid"]-0.6))))
+            s = 0.15 + 0.85 * (0.45 * t["daily"] + 0.55 * (1.0 - abs(t["vivid"] - 0.6)))
         elif "フェミニン" in answer_value:
-            s = 0.15 + 0.85 * (0.55*t["vivid"] + 0.45*t["sparkle"]))
+            s = 0.15 + 0.85 * (0.55 * t["vivid"] + 0.45 * t["sparkle"])
         elif "モード" in answer_value:
-            s = 0.15 + 0.85 * (0.65*t["trend"] + 0.35*(1.0-t["sparkle"])))
+            s = 0.15 + 0.85 * (0.65 * t["trend"] + 0.35 * (1.0 - t["sparkle"]))
         elif "韓国" in answer_value:
-            s = 0.15 + 0.85 * (0.75*t["trend"] + 0.25*t["vivid"]))
+            s = 0.15 + 0.85 * (0.75 * t["trend"] + 0.25 * t["vivid"])
         elif "バラバラ" in answer_value:
-            s = 0.25 + 0.75 * (0.5*t["risk"] + 0.5*t["trend"]))
+            s = 0.25 + 0.75 * (0.5 * t["risk"] + 0.5 * t["trend"])
         else:
             s = 0.2
         return clamp01(s)

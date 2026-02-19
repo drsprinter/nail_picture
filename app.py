@@ -70,127 +70,109 @@ def normalize(weights: list) -> list:
     return [w / s for w in weights]
 
 # =========================================================
-# 1) Nailist Personas (A/B/C)
-#    ★ここをヒヤリング結果で埋める（最重要）
+# 1) Persona registry (readable by persona_id)
 # =========================================================
-# A: 安全・上品・日常適合を最優先（保守派）
-# B: 上品なトレンド編集（今っぽさ重視）
-# C: ワンポイントで新鮮（アートディレクター）
-NAILIST_PERSONAS = {
-    "A": {
-        "persona_id": "conservative_elegant",
-        "display_name": "保守上品派",
-        "tagline": "失敗しない上品さ。肌なじみと清潔感で手元を格上げ。",
+
+DEFAULT_PERSONA_ID = "nailist_01"
+
+PERSONA_REGISTRY = {
+    "nailist_01": {
+        "persona_id": "nailist_01",
+        "display_name": "そのちゃん",
+        "tagline": "お友達",
         "voice": {
-            "tone": "丁寧・安心感・控えめに背中を押す",
-            "style_keywords": ["上品", "清潔感", "肌なじみ", "透明感", "ツヤ"],
-            "avoid_phrases": ["ゴテゴテ", "盛る", "派手すぎ"]
+            "tone": "柔らかい。男前感もあるさっぱりさ。",
+            "style_keywords": ["上品", "透明感", "うる艶", "抜け感"],
+            "avoid_phrases": ["ギャルすぎ", "盛る", "ゴテゴテ"]
         },
         "design_policy": {
+            "must_keep": [
+                "Keep customer's selected options first: vibe, purpose, avoid_colors, nail_duration, age",
+                "Not overly eccentric; aim for ~80% freshness (discover a new side but wearable)",
+                "Adjust daily-fit depending on purpose (work/daily=subtle, event=slightly playful but elegant)",
+                "Do not lean too heavily toward plain beige monochrome; keep it moderately vivid and lively",
+                "Use stones/glitter/art appropriately with ONE tasteful accent point"
+            ],
             "signature_moves": [
-                "透け感ベース＋微細ラメで清潔感",
-                "先端にだけほんのりニュアンス",
-                "ストーンは1粒レベルで上品"
+                "Sheer / milky base with 'churun' glossy finish to make hands look clean and beautiful",
+                "Gradient or jelly-like translucency (soft ombre) to add depth without looking heavy",
+                "Modern French variations: thin French, diagonal French, glitter French, color French (kept elegant)",
+                "Micro-glitter / aurora / subtle magnetic shine used softly (never too flashy)",
+                "Fine mirror/metallic line accents to sharpen the look while keeping it minimal",
+                "One-nail (or max two nails) accent: bijou/stone, small charm, or delicate art as a focal point",
+                "When using motifs/characters, limit color count and keep the overall palette cohesive and clean"
             ],
             "taboo": [
-                "avoid_colorsに触れる色",
-                "強すぎる原色やネオン",
-                "3Dや過度な盛り"
-            ],
-            "accent_rules": {
-                "max_accent_nails": 1,
-                "accent_types_preferred": ["micro_glitter", "subtle_stone", "thin_line", "french_tip"],
-                "accent_intensity": 0.25
-            }
-        },
-        "params": {
-            "risk": 0.25,
-            "daily_fit": 0.90,
-            "trend": 0.40,
-            "minimal": 0.80,
-            "sparkle": 0.25,
-            "vivid": 0.45,
-            "safety": 0.90
-        }
-    },
-    "B": {
-        "persona_id": "trend_editor",
-        "display_name": "上品トレンド派",
-        "tagline": "盛らずに垢抜け。上品のまま今っぽく。",
-        "voice": {
-            "tone": "テンポよく・前向き・おしゃれ編集者",
-            "style_keywords": ["トレンド", "うる艶", "抜け感", "ニュアンス", "洗練"],
-            "avoid_phrases": ["古い", "無難すぎ", "手抜き"]
-        },
-        "design_policy": {
-            "signature_moves": [
-                "マグネット/うる艶系を控えめに",
-                "今っぽいシアーカラーで透明感",
-                "微細ラメを“線”や“先端”で効かせる"
-            ],
-            "taboo": [
-                "avoid_colorsに触れる色",
-                "色数が多すぎて散らかる",
-                "トレンドの押し付け"
+                "Overloaded decoration on all nails (too many stones, heavy glitter, 3D everywhere)",
+                "Too many colors with no cohesion (scattered look)",
+                "Neon / overly saturated primary colors used as full coverage without balance",
+                "Flat heavy matte finish across all nails (prefers glossy / sheer look)",
+                "Solid black full set without design intent (black is fine as an accent/art element)"
             ],
             "accent_rules": {
                 "max_accent_nails": 2,
-                "accent_types_preferred": ["magnet", "micro_glitter", "sheer_gloss", "one_nail_accent"],
-                "accent_intensity": 0.40
+                "accent_types_preferred": [
+                    "micro_glitter",
+                    "aurora",
+                    "magnet",
+                    "mirror_line",
+                    "thin_french",
+                    "subtle_stone",
+                    "bijou_one_nail",
+                    "small_charm",
+                    "minimal_art",
+                    "hand drawing art"
+                ],
+                "accent_intensity": 0.40,
+                "placement_notes": "Either 'one focal point' (bijou on 1 nail) OR 'soft distributed shine' (micro glitter/aurora on multiple nails), but avoid half-hearted scattered accents."
             }
         },
         "params": {
-            "risk": 0.55,
+            "risk": 0.6,
             "daily_fit": 0.70,
-            "trend": 0.95,
-            "minimal": 0.55,
+            "trend": 0.70,
+            "minimal": 0.7,
             "sparkle": 0.40,
-            "vivid": 0.60,
-            "safety": 0.70
-        }
-    },
-    "C": {
-        "persona_id": "art_director",
-        "display_name": "ワンポイントアート派",
-        "tagline": "ワンポイントで新しい自分。上品な遊び心で差をつける。",
-        "voice": {
-            "tone": "クリエイティブ・具体的・提案が明快",
-            "style_keywords": ["アクセント", "余白", "ライン", "配置", "個性"],
-            "avoid_phrases": ["なんとなく", "適当", "盛り盛り"]
+            "vivid": 0.4,
+            "safety": 1.0
         },
-        "design_policy": {
-            "signature_moves": [
-                "1〜2本だけ意図のあるアクセント配置",
-                "先端/ライン/小さなアートで新鮮さ",
-                "色は増やしすぎず“配置”で攻める"
-            ],
-            "taboo": [
-                "avoid_colorsに触れる色",
-                "全面アートで重くなる",
-                "統一感のない柄の乱用"
-            ],
-            "accent_rules": {
-                "max_accent_nails": 2,
-                "accent_types_preferred": ["thin_line", "abstract_art", "french_tip", "one_nail_art", "subtle_stone"],
-                "accent_intensity": 0.45
-            }
+        "color_direction": {
+            "base_palette_notes": "Milky white, sheer beige, greige, dusty pink, soft mauve, light gray, pale blue. Prioritize translucency and hand-brightening tones.",
+            "allowed_accents_notes": "Silver/gold mirror lines, aurora/iridescent shine, subtle magnetic shimmer. Navy/blue as a clean 'tightening' color. Burgundy/red for seasonal/event moods (kept elegant).",
+            "avoid_palette_notes": "Neon full coverage, overly saturated primary colors without balance, muddy/dark heavy full-coverage sets that lose translucency."
         },
-        "params": {
-            "risk": 0.60,
-            "daily_fit": 0.60,
-            "trend": 0.65,
-            "minimal": 0.55,
-            "sparkle": 0.35,
-            "vivid": 0.65,
-            "safety": 0.65
+        "format_constraints": {
+            "output_language": "ja",
+            "plan_format": [
+                "【ネイルコンセプト】...",
+                "【デザイン詳細】..."
+            ],
+            "length_hint": "全体で250〜450文字目安"
         }
     }
 }
 
+def get_persona_from_form(form: dict) -> dict:
+    """
+    form で persona_id が来ればそれを使う。
+    無ければ DEFAULT_PERSONA_ID を使う。
+    """
+    pid = str(form.get("persona_id", "") or "").strip()
+    if not pid:
+        pid = DEFAULT_PERSONA_ID
+    return PERSONA_REGISTRY.get(pid, PERSONA_REGISTRY[DEFAULT_PERSONA_ID])
+
 def build_persona_candidate_prompt(candidate_id: str, persona: dict, user_text: str, selected_summary: dict) -> str:
     """
-    ペルソナ注入版：候補1つだけ生成（A/B/Cを別々に呼ぶ）
+    そのちゃん(同一ペルソナ)でA/B/Cを作るが、各案の役割で自然な幅を出す
     """
+    role_map = {
+        "A": "A：一番外さない（上品・日常適合が高い。清潔感と手元が綺麗に見える方向）",
+        "B": "B：一番“今っぽい”（トレンド寄り。ただし上品で現実的。マグネット/オーロラ/ミラーはやりすぎない）",
+        "C": "C：アクセントが新鮮（1〜2本 or 先端など、ワンポイントで攻める。奇抜NG、でも新しい自分）"
+    }
+    role_text = role_map.get(candidate_id, "方向性が被らないように提案する")
+
     return f"""
 あなたはプロのネイリストです。以下の「ネイリストのペルソナ」に厳密に従って、
 お客様に合うネイル提案を【1案】だけ作ってください。
@@ -206,9 +188,8 @@ def build_persona_candidate_prompt(candidate_id: str, persona: dict, user_text: 
 - ストーン/ラメ/アートは回答に応じて適切に。華やかさは“ワンポイント”で上品に
 - avoid_colors（自由入力）はNG/苦手が含まれる可能性があるため、踏まないこと
 
-【この案の役割】
-- id="{candidate_id}" の案として、ペルソナらしさが最も出る方向で提案する
-- ただし上の絶対条件は必ず守る
+【この案の役割（必ず守る）】
+{role_text}
 
 【出力（JSONのみ）】
 {{
@@ -423,7 +404,7 @@ def choose_next_question(posterior: list, form: dict):
     return {"id": best["qid"], "text": q["text"], "options": q["options"], "required": True}
 
 # =========================================================
-# 3) Candidate evaluation / selection (same as before)
+# 3) Candidate evaluation / selection
 # =========================================================
 
 AXES = [
@@ -511,7 +492,6 @@ def game_start():
 
         next_q = choose_next_question(post, form)
 
-        # ln(8)=2.079 / threshold for "still uncertain"
         if next_q is not None and entropy(post) > 1.15:
             token = secrets.token_urlsafe(16)
             SESSIONS[token] = {"created": time.time(), "img_bytes": img_bytes, "form": form, "posterior": post}
@@ -573,12 +553,13 @@ def finalize_with_posterior(img_bytes: bytes, form: dict, posterior: list):
         "accent_preference": form.get("accent_preference", "")
     }
 
+    persona = get_persona_from_form(form)
+
     # -----------------------------------------------------
-    # (1) Generate 3 candidates separately using personas
+    # (1) Generate 3 candidates (A/B/C) using the same nailist persona_id
     # -----------------------------------------------------
     candidates = []
     for cid in ["A", "B", "C"]:
-        persona = NAILIST_PERSONAS.get(cid, {})
         prompt = build_persona_candidate_prompt(cid, persona, user_text, selected_summary)
 
         res = client.chat.completions.create(
@@ -592,7 +573,6 @@ def finalize_with_posterior(img_bytes: bytes, form: dict, posterior: list):
 
         try:
             payload = safe_extract_json(res.choices[0].message.content)
-            # minimal validation
             if payload.get("id") != cid:
                 payload["id"] = cid
             if not payload.get("plan_ja"):
@@ -608,7 +588,7 @@ def finalize_with_posterior(img_bytes: bytes, form: dict, posterior: list):
             })
 
     # -----------------------------------------------------
-    # (2) Evaluate candidates (same as before)
+    # (2) Evaluate candidates
     # -----------------------------------------------------
     eval_prompt = f"""
 あなたはネイル提案の品質評価者です。
@@ -655,7 +635,7 @@ def finalize_with_posterior(img_bytes: bytes, form: dict, posterior: list):
     plan_text = (picked.get("candidate") or {}).get("plan_ja") or candidates[0].get("plan_ja", "")
 
     # -----------------------------------------------------
-    # (3) Build English image-edit prompt (same as before)
+    # (3) Build English image-edit prompt
     # -----------------------------------------------------
     spec_prompt = f"""
 You are a top nail artist who writes image-edit prompts.
@@ -704,7 +684,7 @@ Chosen nail plan (Japanese, for reference only):
         )
 
     # -----------------------------------------------------
-    # (4) Image edit (same as before)
+    # (4) Image edit
     # -----------------------------------------------------
     image_data_url = None
     image_error = None
@@ -740,6 +720,8 @@ Chosen nail plan (Japanese, for reference only):
         "image_data_url": image_data_url,
         "image_error": image_error,
         "debug": {
+            "persona_id_used": persona.get("persona_id"),
+            "persona_name": persona.get("display_name"),
             "posterior_top3": top,
             "picked_expected_utility": picked.get("eu"),
             "picked_id": (picked.get("candidate") or {}).get("id"),

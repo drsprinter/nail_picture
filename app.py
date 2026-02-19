@@ -602,7 +602,7 @@ def finalize_with_posterior(img_bytes: bytes, form: dict, posterior: list):
 - accent_fit_one_point
 
 重要ルール：
-- avoid_colors（自由入力）は“NG/苦手”が含まれる可能性があります。明確なNGを踏んでいる場合は該当軸を大きく減点。
+- avoid_colors（自由入力）は“NG/苦手”が含まれる可能性があります。明確なNGを踏んでいる場合は該当軸を大きく減点。〜したいような要望は優先順位を高く。
 - 追加項目（challenge_level / outfit_style / top_priority / accent_preference）があれば、整合している案を加点（ただし選択項目より優先しない）。
 
 出力は【JSONのみ】：

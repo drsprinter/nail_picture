@@ -7,6 +7,7 @@ import json
 import time
 import math
 import secrets
+import re
 
 app = Flask(__name__)
 CORS(app, origins=[
@@ -68,6 +69,12 @@ def normalize(weights: list) -> list:
         n = len(weights)
         return [1.0 / n for _ in range(n)]
     return [w / s for w in weights]
+
+def safe_int(x, default=0):
+    try:
+        return int(x)
+    except Exception:
+        return default
 
 # =========================================================
 # 1) Persona registry (readable by persona_id)
@@ -153,18 +160,126 @@ PERSONA_REGISTRY = {
 }
 
 def get_persona_from_form(form: dict) -> dict:
-    """
-    form で persona_id が来ればそれを使う。
-    無ければ DEFAULT_PERSONA_ID を使う。
-    """
     pid = str(form.get("persona_id", "") or "").strip()
     if not pid:
         pid = DEFAULT_PERSONA_ID
     return PERSONA_REGISTRY.get(pid, PERSONA_REGISTRY[DEFAULT_PERSONA_ID])
 
-def build_persona_candidate_prompt(candidate_id: str, persona: dict, user_text: str, selected_summary: dict) -> str:
+# =========================================================
+# 1.5) Free input -> spec (Lv2)
+# =========================================================
+
+def quick_specificity_heuristic(free_text: str) -> int:
     """
-    そのちゃん(同一ペルソナ)でA/B/Cを作るが、各案の役割で自然な幅を出す
+    LLMが落ちた時の雑な具体度推定（0-100）
+    - 文字数 + 記号/色/技法キーワードで加点
+    """
+    t = (free_text or "").strip()
+    if not t:
+        return 0
+    score = 0
+    # length
+    score += min(60, len(t))
+    # keywords (rough)
+    keywords = ["フレンチ", "グラデ", "マグネット", "ミラー", "オーロラ", "ちゅるん", "シアー",
+                "ストーン", "ラメ", "ニュアンス", "チェック", "ハート", "リボン", "キャラ",
+                "ブルー", "ネイビー", "ピンク", "赤", "黒", "白", "グレー", "ベージュ", "ブラウン", "グリーン"]
+    score += 5 * sum(1 for k in keywords if k in t)
+    # "NG" patterns
+    if "NG" in t or "苦手" in t or "避け" in t or "なし" in t:
+        score += 10
+    return max(0, min(100, score))
+
+def extract_free_spec(free_text: str, selected_summary: dict) -> dict:
+    """
+    avoid_colors(自由入力)を 'spec' に変換して、強制力を持たせる
+    spec = {specificity:0-100, must:[], must_not:[], soft:[], keywords:[], summary:"..."}
+    """
+    free_text = (free_text or "").strip()
+    if not free_text:
+        return {
+            "specificity": 0,
+            "must": [],
+            "must_not": [],
+            "soft": [],
+            "keywords": [],
+            "summary": ""
+        }
+
+    prompt = f"""
+You are an expert nail concierge.
+
+Convert the customer's free-text request into a structured spec.
+This free-text field may contain:
+- Desired design ideas (must)
+- Things they want to avoid (must_not)
+- Mood/finish preferences (soft)
+- Colors / techniques / motifs keywords (keywords)
+
+Important:
+- This spec MUST be honored strongly when specificity is high.
+- Respect avoid_colors-as-free-text nature: it may include "NG" or "avoid" items.
+- Do not invent new preferences not implied by the text.
+- Return ONLY valid JSON.
+
+Return JSON format:
+{{
+  "specificity": 0-100,
+  "must": ["..."],
+  "must_not": ["..."],
+  "soft": ["..."],
+  "keywords": ["..."],
+  "summary": "one short Japanese summary"
+}}
+
+Customer free-text:
+{free_text}
+
+Customer selection summary (for context only):
+{json.dumps(selected_summary, ensure_ascii=False)}
+""".strip()
+
+    try:
+        res = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "Return JSON only."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.2
+        )
+        spec = safe_extract_json(res.choices[0].message.content)
+
+        # sanitize
+        spec_out = {
+            "specificity": max(0, min(100, safe_int(spec.get("specificity", 0), 0))),
+            "must": [str(x).strip() for x in (spec.get("must") or []) if str(x).strip()],
+            "must_not": [str(x).strip() for x in (spec.get("must_not") or []) if str(x).strip()],
+            "soft": [str(x).strip() for x in (spec.get("soft") or []) if str(x).strip()],
+            "keywords": [str(x).strip() for x in (spec.get("keywords") or []) if str(x).strip()],
+            "summary": str(spec.get("summary", "") or "").strip()
+        }
+
+        # fallback if somehow empty
+        if spec_out["specificity"] == 0:
+            spec_out["specificity"] = quick_specificity_heuristic(free_text)
+
+        return spec_out
+
+    except Exception:
+        # fallback heuristic
+        return {
+            "specificity": quick_specificity_heuristic(free_text),
+            "must": [],
+            "must_not": [],
+            "soft": [],
+            "keywords": [],
+            "summary": ""
+        }
+
+def build_persona_candidate_prompt(candidate_id: str, persona: dict, user_text: str, selected_summary: dict, free_spec: dict) -> str:
+    """
+    同一ペルソナでA/B/Cを作るが、自由入力specの具体度に応じて優先順位を変える（Lv2）
     """
     role_map = {
         "A": "A：一番外さない（上品・日常適合が高い。清潔感と手元が綺麗に見える方向）",
@@ -173,6 +288,34 @@ def build_persona_candidate_prompt(candidate_id: str, persona: dict, user_text: 
     }
     role_text = role_map.get(candidate_id, "方向性が被らないように提案する")
 
+    specificity = safe_int(free_spec.get("specificity", 0), 0)
+    free_mode = "LOW"
+    if specificity >= 70:
+        free_mode = "HIGH"
+    elif specificity >= 35:
+        free_mode = "MID"
+
+    # In HIGH mode, spec.must/must_not are treated as top priority constraints (within safety + avoid_colors).
+    priority_rules = ""
+    if free_mode == "HIGH":
+        priority_rules = """
+【最重要ルール（自由入力が具体的な場合）】
+- 以下の free_spec.must / free_spec.must_not は「最優先の設計条件」です（選択項目よりも上に扱う）
+- ただし、お客様の avoid_colors（NG）や安全性（奇抜すぎない/上品/現実的）は常に守る
+- must がある場合は必ず含め、must_not は絶対に踏まない
+""".strip()
+    elif free_mode == "MID":
+        priority_rules = """
+【重要ルール（自由入力がある程度具体的な場合）】
+- free_spec.must / free_spec.must_not を強く反映する（可能な限り満たす）
+- ただし選択項目との整合も保つ
+""".strip()
+    else:
+        priority_rules = """
+【自由入力が少ない/曖昧な場合】
+- free_spec.soft/keywords はヒントとして扱い、選択項目を中心に提案する
+""".strip()
+
     return f"""
 あなたはプロのネイリストです。以下の「ネイリストのペルソナ」に厳密に従って、
 お客様に合うネイル提案を【1案】だけ作ってください。
@@ -180,13 +323,18 @@ def build_persona_candidate_prompt(candidate_id: str, persona: dict, user_text: 
 【ネイリストのペルソナ（必ず従う）】
 {json.dumps(persona, ensure_ascii=False)}
 
+【自由入力の解釈（free_spec）】
+{json.dumps(free_spec, ensure_ascii=False)}
+
+{priority_rules}
+
 【絶対条件（Hard constraints）】
-- お客様の選択項目（vibe / purpose / avoid_colors / nail_duration / age）を最優先に踏襲（これが最上位）
+- お客様の選択項目（vibe / purpose / nail_duration / age）を踏襲
+- avoid_colors（自由入力）はNG/苦手が含まれる可能性があるため、踏まないこと（最優先の安全制約）
 - 奇抜すぎない：新しさは80%程度（新しい自分を発見できるが上品で現実的）
 - 日常へ馴染むかどうかは選択項目に応じて適切に調整（仕事寄りなら控えめ、イベント寄りなら少し遊ぶ）
 - ベージュ単色に寄りすぎない（程よく鮮やかさ・血色・透明感を入れる）
 - ストーン/ラメ/アートは回答に応じて適切に。華やかさは“ワンポイント”で上品に
-- avoid_colors（自由入力）はNG/苦手が含まれる可能性があるため、踏まないこと
 
 【この案の役割（必ず守る）】
 {role_text}
@@ -201,12 +349,12 @@ def build_persona_candidate_prompt(candidate_id: str, persona: dict, user_text: 
 【お客様情報（そのまま）】
 {user_text}
 
-【お客様の選択項目サマリ（最優先）】
+【お客様の選択項目サマリ】
 {json.dumps(selected_summary, ensure_ascii=False)}
 """.strip()
 
 # =========================================================
-# 2) Type space (user's private preference type θ)
+# 2) Bayesian type model (unchanged)
 # =========================================================
 
 TYPE_SPACE = [
@@ -225,9 +373,11 @@ def prior_from_selections(form: dict) -> list:
     w = [1.0 for _ in TYPE_SPACE]
 
     purpose = form.get("purpose", [])
-    if isinstance(purpose, str): purpose = [purpose]
+    if isinstance(purpose, str):
+        purpose = [purpose]
     vibe = form.get("vibe", [])
-    if isinstance(vibe, str): vibe = [vibe]
+    if isinstance(vibe, str):
+        vibe = [vibe]
     age = str(form.get("age", "") or "")
 
     def boost(type_id, amount):
@@ -404,16 +554,18 @@ def choose_next_question(posterior: list, form: dict):
     return {"id": best["qid"], "text": q["text"], "options": q["options"], "required": True}
 
 # =========================================================
-# 3) Candidate evaluation / selection
+# 3) Candidate evaluation / selection (Lv2: free_input_alignment)
 # =========================================================
 
-AXES = [
+AXES_BASE = [
     "adherence_to_selections",
     "wearability_daily_fit",
     "novelty_target_80",
     "colorfulness_not_beige_only",
     "accent_fit_one_point"
 ]
+FREE_AXIS = "free_input_alignment"
+
 TYPE_WEIGHTS = {
     "T1": {"adherence_to_selections":0.30,"wearability_daily_fit":0.30,"novelty_target_80":0.14,"colorfulness_not_beige_only":0.14,"accent_fit_one_point":0.12},
     "T2": {"adherence_to_selections":0.24,"wearability_daily_fit":0.20,"novelty_target_80":0.22,"colorfulness_not_beige_only":0.18,"accent_fit_one_point":0.16},
@@ -425,30 +577,80 @@ TYPE_WEIGHTS = {
     "T8": {"adherence_to_selections":0.18,"wearability_daily_fit":0.16,"novelty_target_80":0.22,"colorfulness_not_beige_only":0.22,"accent_fit_one_point":0.22},
 }
 
-def expected_utility(scores: dict, posterior: list) -> float:
-    u = 0.0
+def free_weight_from_specificity(spec: dict) -> float:
+    """
+    自由入力の影響度（0.0〜0.35）
+    """
+    s = safe_int(spec.get("specificity", 0), 0)
+    if s >= 85:
+        return 0.35
+    if s >= 70:
+        return 0.30
+    if s >= 50:
+        return 0.22
+    if s >= 35:
+        return 0.14
+    if s >= 20:
+        return 0.08
+    return 0.0
+
+def expected_utility(scores: dict, posterior: list, free_spec: dict) -> float:
+    """
+    既存軸の期待効用 + 自由入力整合の加点（具体度に応じて）
+    """
+    base_u = 0.0
     for p, th in zip(posterior, TYPE_SPACE):
         w = TYPE_WEIGHTS[th["id"]]
         su = 0.0
-        for ax in AXES:
+        for ax in AXES_BASE:
             su += w.get(ax, 0.0) * (float(scores.get(ax, 0.0)) / 100.0)
-        u += p * su
-    return u
+        base_u += p * su
 
-def pick_by_expected_utility(candidates: list, eval_payload: dict, posterior: list) -> dict:
+    fw = free_weight_from_specificity(free_spec)
+    free_score = float(scores.get(FREE_AXIS, 0.0) or 0.0) / 100.0
+    return base_u + fw * free_score
+
+def pick_by_expected_utility(candidates: list, eval_payload: dict, posterior: list, free_spec: dict) -> dict:
     results = eval_payload.get("results") or []
     by_id = {r.get("id"): r for r in results if r.get("id")}
+
+    specificity = safe_int(free_spec.get("specificity", 0), 0)
+    hard_gate = (specificity >= 70)
+
     best = None
     for c in candidates:
         cid = c.get("id")
         r = by_id.get(cid, {})
         scores = (r.get("scores") or {})
-        eu = expected_utility(scores, posterior)
+
+        # Hard gate when free input is very specific:
+        if hard_gate:
+            align = float(scores.get(FREE_AXIS, 0) or 0)
+            if align < 70:
+                continue  # disqualify
+
+        eu = expected_utility(scores, posterior, free_spec)
         adherence = float(scores.get("adherence_to_selections", 0) or 0)
-        tup = (eu, adherence)
+        free_align = float(scores.get(FREE_AXIS, 0) or 0)
+
+        # tie-breaker: EU -> free_align -> adherence
+        tup = (eu, free_align, adherence)
         if (best is None) or (tup > best["tup"]):
             best = {"candidate": c, "eval": r, "eu": eu, "tup": tup}
-    return best or {"candidate": candidates[0] if candidates else {}, "eval": {}, "eu": 0.0, "tup": (0.0, 0.0)}
+
+    # If everything got disqualified, fall back to highest free_align then adherence
+    if best is None and candidates:
+        for c in candidates:
+            cid = c.get("id")
+            r = by_id.get(cid, {})
+            scores = (r.get("scores") or {})
+            free_align = float(scores.get(FREE_AXIS, 0) or 0)
+            adherence = float(scores.get("adherence_to_selections", 0) or 0)
+            tup = (free_align, adherence)
+            if (best is None) or (tup > best["tup"]):
+                best = {"candidate": c, "eval": r, "eu": 0.0, "tup": (0.0, free_align, adherence)}
+
+    return best or {"candidate": candidates[0] if candidates else {}, "eval": {}, "eu": 0.0, "tup": (0.0, 0.0, 0.0)}
 
 # =========================================================
 # 4) Sessions
@@ -535,7 +737,7 @@ def game_answer():
         return jsonify({"error": str(e)}), 500
 
 # =========================================================
-# 6) Main finalize
+# 6) Main finalize (Lv2)
 # =========================================================
 
 def finalize_with_posterior(img_bytes: bytes, form: dict, posterior: list):
@@ -546,7 +748,7 @@ def finalize_with_posterior(img_bytes: bytes, form: dict, posterior: list):
         "nail_duration": form.get("nail_duration", ""),
         "purpose": form.get("purpose", []),
         "vibe": form.get("vibe", []),
-        "avoid_colors": form.get("avoid_colors", ""),
+        "avoid_colors": form.get("avoid_colors", ""),  # free input field
         "challenge_level": form.get("challenge_level", ""),
         "outfit_style": form.get("outfit_style", ""),
         "top_priority": form.get("top_priority", ""),
@@ -555,12 +757,16 @@ def finalize_with_posterior(img_bytes: bytes, form: dict, posterior: list):
 
     persona = get_persona_from_form(form)
 
+    # --- Lv2: Build free_spec from free input ---
+    free_text = str(form.get("avoid_colors", "") or "").strip()
+    free_spec = extract_free_spec(free_text, selected_summary)
+
     # -----------------------------------------------------
-    # (1) Generate 3 candidates (A/B/C) using the same nailist persona_id
+    # (1) Generate 3 candidates (A/B/C) with free_spec injected
     # -----------------------------------------------------
     candidates = []
     for cid in ["A", "B", "C"]:
-        prompt = build_persona_candidate_prompt(cid, persona, user_text, selected_summary)
+        prompt = build_persona_candidate_prompt(cid, persona, user_text, selected_summary, free_spec)
 
         res = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -588,31 +794,45 @@ def finalize_with_posterior(img_bytes: bytes, form: dict, posterior: list):
             })
 
     # -----------------------------------------------------
-    # (2) Evaluate candidates
+    # (2) Evaluate candidates (add free_input_alignment)
     # -----------------------------------------------------
     eval_prompt = f"""
 あなたはネイル提案の品質評価者です。
-下の「お客様の選択項目」と「候補3案」を読み、各案を0〜100点で採点してください。
+下の「お客様の選択項目」「free_spec（自由入力の解釈）」「候補3案」を読み、各案を0〜100点で採点してください。
 
 採点軸（0〜100）：
-- adherence_to_selections
-- wearability_daily_fit
-- novelty_target_80
-- colorfulness_not_beige_only
-- accent_fit_one_point
+- adherence_to_selections: 選択項目（vibe/purpose/nail_duration/age）への忠実さ
+- wearability_daily_fit: 目的に応じた日常適合（仕事なら浮かない、イベントなら程よく映える等）
+- novelty_target_80: “80%新しさ”のちょうど良さ（奇抜すぎない・でも新しい）
+- colorfulness_not_beige_only: ベージュ単色に寄りすぎず、程よい鮮やかさ/血色/透明感がある
+- accent_fit_one_point: ストーン/ラメ/アートの使い方が回答に合い、ワンポイントで上品
+- free_input_alignment: free_spec.must / must_not / soft をどれだけ満たしているか（自由入力の反映度）
 
-重要ルール：
-- avoid_colors（自由入力）は“NG/苦手”が含まれる可能性があります。明確なNGを踏んでいる場合は該当軸を大きく減点。〜したいような要望は優先順位を高く。
-- 追加項目（challenge_level / outfit_style / top_priority / accent_preference）があれば、整合している案を加点（ただし選択項目より優先しない）。
+重要ルール（超重要）：
+- avoid_colors（自由入力）は“NG/苦手”が含まれる可能性があります。明確なNGを踏んでいる場合は大幅減点。
+- free_spec.specificity が高い（70以上）場合、free_spec.must / must_not を満たせていない案は free_input_alignment を低くし、全体評価も厳しくしてください。
+- 追加項目（challenge_level / outfit_style / top_priority / accent_preference）があれば整合している案を加点（ただしNG違反は絶対にNG）。
 
 出力は【JSONのみ】：
 {{
   "results": [
-    {{"id":"A","scores":{{"adherence_to_selections":0,"wearability_daily_fit":0,"novelty_target_80":0,"colorfulness_not_beige_only":0,"accent_fit_one_point":0}},"notes":"..."}},
-    {{"id":"B","scores":{{"adherence_to_selections":0,"wearability_daily_fit":0,"novelty_target_80":0,"colorfulness_not_beige_only":0,"accent_fit_one_point":0}},"notes":"..."}},
-    {{"id":"C","scores":{{"adherence_to_selections":0,"wearability_daily_fit":0,"novelty_target_80":0,"colorfulness_not_beige_only":0,"accent_fit_one_point":0}},"notes":"..."}}
+    {{
+      "id":"A",
+      "scores": {{
+        "adherence_to_selections": 0,
+        "wearability_daily_fit": 0,
+        "novelty_target_80": 0,
+        "colorfulness_not_beige_only": 0,
+        "accent_fit_one_point": 0,
+        "free_input_alignment": 0
+      }},
+      "notes":"短い根拠（内部用）"
+    }}
   ]
 }}
+
+free_spec（自由入力の解釈）：
+{json.dumps(free_spec, ensure_ascii=False)}
 
 お客様の選択項目サマリ：
 {json.dumps(selected_summary, ensure_ascii=False)}
@@ -631,11 +851,12 @@ def finalize_with_posterior(img_bytes: bytes, form: dict, posterior: list):
     )
     eval_payload = safe_extract_json(eval_res.choices[0].message.content)
 
-    picked = pick_by_expected_utility(candidates, eval_payload, posterior)
+    # Pick with Lv2: hard-gate + bonus from free alignment
+    picked = pick_by_expected_utility(candidates, eval_payload, posterior, free_spec)
     plan_text = (picked.get("candidate") or {}).get("plan_ja") or candidates[0].get("plan_ja", "")
 
     # -----------------------------------------------------
-    # (3) Build English image-edit prompt
+    # (3) Build English image-edit prompt (prioritize free_spec when specific)
     # -----------------------------------------------------
     spec_prompt = f"""
 You are a top nail artist who writes image-edit prompts.
@@ -645,17 +866,28 @@ Create an English prompt to edit the uploaded photo.
 Hard rules (must follow):
 - Keep the same hand, skin tone, lighting, background, and composition.
 - Edit ONLY the nails. Do NOT change fingers, skin, jewelry, or background.
-- Strictly follow the customer's selected options first (vibe / purpose / avoid_colors / nail_duration / age).
-- Not overly eccentric: aim for around 80% freshness—help the customer discover a new side of themselves while keeping it wearable.
-- Adjust how well it blends into daily life depending on the selected options (work/daily = subtle; event = a bit playful but still elegant).
-- Do not lean too heavily toward a plain beige monochrome; make it moderately vivid and lively.
-- Use stones, glitter, and nail art appropriately based on the customer's answers, with only ONE tasteful accent point.
-- No text, no watermark, no logos.
+- Do NOT add text, watermark, or logos.
+
+Priority rules:
+- If free_spec.specificity is high (>=70), treat free_spec.must and free_spec.must_not as top-priority constraints.
+- Always respect customer's avoid items and must_not.
+
+Design constraints:
+- Follow the customer's selected options (vibe / purpose / nail_duration / age).
+- Not overly eccentric: aim for around 80% freshness—wearable and elegant.
+- Avoid plain beige-only; keep it moderately vivid.
+- If adding sparkle/art, keep it as ONE tasteful accent point.
 
 Return ONLY valid JSON:
 {{"edit_prompt_en":"..."}}
 
-Customer preferences:
+free_spec:
+{json.dumps(free_spec, ensure_ascii=False)}
+
+Customer selections:
+{json.dumps(selected_summary, ensure_ascii=False)}
+
+Customer full text (for context):
 {user_text}
 
 Chosen nail plan (Japanese, for reference only):
@@ -674,14 +906,22 @@ Chosen nail plan (Japanese, for reference only):
     edit_prompt = (spec.get("edit_prompt_en") or "").strip()
 
     if not edit_prompt:
+        # fallback: basic prompt + free_spec highlights
+        must = free_spec.get("must") or []
+        must_not = free_spec.get("must_not") or []
         edit_prompt = (
             "Keep the same hand, skin tone, lighting, background, and composition. "
             "Edit ONLY the nails (do not change fingers/skin/jewelry/background). "
-            "Follow the customer's selected options first. Aim for ~80% freshness while staying wearable and elegant. "
+            "No text, no watermark. "
+            "Follow customer selections first. "
+            "Aim for ~80% freshness while staying wearable and elegant. "
             "Avoid a plain beige-only look; keep it moderately vivid. "
-            "If adding sparkle/art, keep it as ONE tasteful accent point. "
-            "No text, no watermark."
+            "Use only ONE tasteful accent point if needed. "
         )
+        if must:
+            edit_prompt += "Must include: " + "; ".join(must) + ". "
+        if must_not:
+            edit_prompt += "Must NOT include: " + "; ".join(must_not) + ". "
 
     # -----------------------------------------------------
     # (4) Image edit
@@ -722,10 +962,12 @@ Chosen nail plan (Japanese, for reference only):
         "debug": {
             "persona_id_used": persona.get("persona_id"),
             "persona_name": persona.get("display_name"),
+            "free_spec": free_spec,
             "posterior_top3": top,
             "picked_expected_utility": picked.get("eu"),
             "picked_id": (picked.get("candidate") or {}).get("id"),
-            "candidates_debug": candidates
+            "candidates_debug": candidates,
+            "eval_debug": eval_payload
         }
     })
 
